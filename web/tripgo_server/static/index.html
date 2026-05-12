@@ -660,10 +660,12 @@ function HumanSuccess({ go, order }) {
 
 // ===== Agent Monitor (live feed from real ZK traffic) =====
 const FEED_DETAILS = {
-  zk_proof:        { lbl:'ZK Proof',       det:'约束 ①–⑥ 通过 · Ligero v2 · ~350 KB' },
-  delegation_sig:  { lbl:'Delegation Sig', det:'P-256 ECDSA · 委托签名有效' },
-  policy_claims:   { lbl:'Policy / Claims',det:'allowed_claims 覆盖 reader request' },
-  policy_expiry:   { lbl:'Policy / Expiry',det:'委托未过期' },
+  zk_proof:              { lbl:'ZK Proof',             det:'约束 ①–⑥ 通过 · Ligero v2 · ~350 KB' },
+  delegation_sig:        { lbl:'Delegation Sig',       det:'P-256 ECDSA · 委托签名有效' },
+  policy_claims:         { lbl:'Policy / Claims',      det:'allowed_claims 覆盖 reader request' },
+  policy_predicates:     { lbl:'Policy / Predicates',  det:'DISCLOSE / EQ / IN_SET / GE / LE 谓词全部满足' },
+  policy_expiry:         { lbl:'Policy / Expiry',      det:'委托未过期' },
+  delegation_revocation: { lbl:'Delegation Revocation',det:'委托未被 sk_d 撤销' },
 };
 
 function AgentMonitor({ go }) {
@@ -711,7 +713,9 @@ function AgentMonitor({ go }) {
     { key:'zk_proof', ...FEED_DETAILS.zk_proof },
     { key:'delegation_sig', ...FEED_DETAILS.delegation_sig },
     { key:'policy_claims', ...FEED_DETAILS.policy_claims },
+    { key:'policy_predicates', ...FEED_DETAILS.policy_predicates },
     { key:'policy_expiry', ...FEED_DETAILS.policy_expiry },
+    { key:'delegation_revocation', ...FEED_DETAILS.delegation_revocation },
   ];
   return (
     <div className="aw">

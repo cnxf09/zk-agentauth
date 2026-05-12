@@ -108,9 +108,15 @@ def order_human():
 
 @app.route("/api/agent/request", methods=["POST"])
 def agent_request():
-    """Server-to-server: Wallet Server asks for a reader request."""
+    """Server-to-server: Wallet Server asks for a reader request.
+
+    Optional `predicates` (list of "claim:OP:value" strings) are passed
+    through verbatim so the resulting reader_request binds the same
+    predicate set the prover used.
+    """
     body = request.get_json(force=True, silent=True) or {}
     claims = body.get("claims") or ["age_over_18"]
+    predicates = body.get("predicates") or []
     if not ISSUER_PUBLIC_DIR.exists():
         return jsonify({"error": "issuer_public not provisioned"}), 500
     req_id = uuid.uuid4().hex[:10]
@@ -119,6 +125,7 @@ def agent_request():
         issuer_public=ISSUER_PUBLIC_DIR,
         claims=claims,
         out_dir=req_dir,
+        predicates=predicates,
     )
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:

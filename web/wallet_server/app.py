@@ -26,6 +26,7 @@ DATA = ROOT / "data"
 HOLDER_DIR = DATA / "wallet" / "holder"
 DELEGATION_DIR = DATA / "wallet" / "delegation"
 TASKS_DIR = DATA / "wallet" / "tasks"
+REVOCATION_STATE_PATH = DATA / "wallet" / "revocation_state.json"
 ISSUER_PUBLIC_DIR = DATA / "shared" / "issuer_public"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -125,6 +126,50 @@ def wallet_reissue():
     return jsonify({"ok": True, "claims": _read_holder_claims()})
 
 
+# ── Revocation state ──────────────────────────────────────────────────
+# In the real protocol Alice would write the revoked rh into an on-chain
+# Merkle tree (RL). The demo backend doesn't run a chain; instead, when the
+# user "revokes" a delegation from the wallet UI, we flag the wallet so the
+# *next* Agent dispatch is built with --revoked. The verifier then fails the
+# "Delegation revocation" check and the order is rejected. This is enough to
+# demonstrate the end-to-end revocation effect against the real C++ verifier.
+def _load_revocation_state() -> dict:
+    if not REVOCATION_STATE_PATH.exists():
+        return {"pending": False, "rh": None, "revoked_at": None}
+    try:
+        return json.loads(REVOCATION_STATE_PATH.read_text())
+    except Exception:
+        return {"pending": False, "rh": None, "revoked_at": None}
+
+
+def _save_revocation_state(state: dict):
+    REVOCATION_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    REVOCATION_STATE_PATH.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+
+
+@app.route("/api/wallet/revoke", methods=["POST"])
+def wallet_revoke():
+    body = request.get_json(force=True, silent=True) or {}
+    rh = (body.get("rh") or "").strip()
+    from datetime import datetime, timezone
+    state = {"pending": True, "rh": rh or None,
+             "revoked_at": datetime.now(timezone.utc).isoformat()}
+    _save_revocation_state(state)
+    return jsonify({"ok": True, "state": state,
+                    "note": "next agent dispatch will be marked --revoked"})
+
+
+@app.route("/api/wallet/revoke/status")
+def wallet_revoke_status():
+    return jsonify(_load_revocation_state())
+
+
+@app.route("/api/wallet/revoke/clear", methods=["POST"])
+def wallet_revoke_clear():
+    _save_revocation_state({"pending": False, "rh": None, "revoked_at": None})
+    return jsonify({"ok": True})
+
+
 @app.route("/api/catalog")
 def catalog_proxy():
     try:
@@ -142,13 +187,28 @@ def agent_dispatch():
     body = request.get_json(force=True, silent=True) or {}
     if not _holder_present():
         return jsonify({"error": "no mDoc on wallet — call /api/wallet/reissue first"}), 400
+    # Pending revocation (set by the wallet UI's "撤销委托" button) takes
+    # precedence over the dispatch body's revoked flag. Consume-on-use: read
+    # the flag, clear it, then mark THIS dispatch as revoked so the verifier
+    # returns "Delegation revocation: FAIL" and the order is rejected.
+    rev_state = _load_revocation_state()
+    revoked_pending = bool(rev_state.get("pending"))
+    if revoked_pending:
+        _save_revocation_state({"pending": False, "rh": None, "revoked_at": None})
+
     params = {
         "hotel_id": int(body.get("hotel_id", 0)),
         "checkin": body.get("checkin", "2026-05-10"),
         "checkout": body.get("checkout", "2026-05-12"),
         "claims": body.get("claims") or ["age_over_18"],
+        # Optional generic predicates, each as "claim:OP:value"
+        # (DISCLOSE / EQ / IN_SET / GE / LE). Empty → only basic claim disclosure.
+        "predicates": body.get("predicates") or [],
         "expires": body.get("expires", "2027-01-01T00:00:00Z"),
         "agent_id": body.get("agent_id", "tripgo-agent"),
+        # When true, Alice writes a pre-revoked delegation_revocation_status.json;
+        # used for negative-path demos of the "Delegation revocation" check.
+        "revoked": revoked_pending or bool(body.get("revoked")),
     }
     if not params["hotel_id"]:
         return jsonify({"error": "hotel_id required"}), 400

@@ -59,7 +59,7 @@ cd web && make build
 ### 方式 A · Web 双服务演示（推荐，可视化）
 
 ```bash
-cd web
+m
 make deps          # python3 -m venv .venv && pip install -r requirements.txt
 make demo          # ./start.sh，自动打开浏览器
 ```

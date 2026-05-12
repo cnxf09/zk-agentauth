@@ -1760,7 +1760,19 @@ function DelegationDetail({ delId, onBack }) {
         </Section>
       </div>
 
-      {confirming && <RevokeDialog d={d} onClose={() => setConfirming(false)} />}
+      {confirming && (
+        <RevokeDialog
+          d={d}
+          onClose={() => setConfirming(false)}
+          onRevoked={(rd) => {
+            // Reflect the revocation in the in-memory mock so the
+            // 委托管理 list immediately shows the delegation as 'revoked'.
+            const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
+            rd.status = 'revoked';
+            rd.revokedAt = now;
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1821,8 +1833,29 @@ function TrustChainViz({ cd, a, d }) {
   );
 }
 
-function RevokeDialog({ d, onClose }) {
+function RevokeDialog({ d, onClose, onRevoked }) {
   const ds = useDS(); const c = colors(ds);
+  const [busy, setBusy] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const submit = async () => {
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/wallet/revoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rh: d.rh, delegation_id: d.id }),
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await r.json();
+      setDone(true);
+      onRevoked && onRevoked(d);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div style={{
       position: 'absolute', inset: 0,
@@ -1831,29 +1864,51 @@ function RevokeDialog({ d, onClose }) {
       zIndex: 10,
     }}>
       <div style={{
-        width: 440, background: c.bg, borderRadius: 14,
+        width: 460, background: c.bg, borderRadius: 14,
         padding: ds.sp.xl, boxShadow: '0 16px 64px rgba(0,0,0,0.32)',
         border: '0.5px solid ' + c.border,
       }}>
         <div style={{ fontSize: ds.fs.h, fontWeight: 600, color: c.text, marginBottom: 8 }}>
-          撤销委托？
+          {done ? '撤销已生效' : '撤销委托？'}
         </div>
-        <div style={{ fontSize: ds.fs.m, color: c.textSub, lineHeight: 1.6, marginBottom: ds.sp.l }}>
-          撤销后，撤销句柄 <code style={{ fontFamily: ds.mono, fontSize: ds.fs.s }}>{d.rh}</code> 将被写入链上 Merkle 树，
-          所有此后的证明都会因约束⑪非成员证明失败而被验证者拒绝。
-        </div>
-        <Mono label="将提交到 RS 的撤销句柄" full>{d.rh}</Mono>
+        {!done && (
+          <div style={{ fontSize: ds.fs.m, color: c.textSub, lineHeight: 1.6, marginBottom: ds.sp.l }}>
+            撤销后，撤销句柄 <code style={{ fontFamily: ds.mono, fontSize: ds.fs.s }}>{d.rh}</code> 将被写入撤销列表 RL，
+            所有此后的证明都会因约束⑪非成员证明失败而被验证者拒绝。
+          </div>
+        )}
+        {done && (
+          <div style={{ fontSize: ds.fs.m, color: c.textSub, lineHeight: 1.6, marginBottom: ds.sp.l }}>
+            撤销句柄 <code style={{ fontFamily: ds.mono, fontSize: ds.fs.s }}>{d.rh}</code> 已登记到本地钱包。
+            <strong style={{ color: c.text }}> 下一次 Agent 派单</strong>将携带 <code style={{ fontFamily: ds.mono }}>--revoked</code>，
+            C++ Prover 在生成 ZK 证明时会因约束⑪非成员证明失败而直接拒绝出示，
+            报错 <code style={{ fontFamily: ds.mono, color: c.danger }}>delegation is revoked</code>。
+          </div>
+        )}
+        <Mono label="撤销句柄 rh" full>{d.rh}</Mono>
         <div style={{
           marginTop: ds.sp.m, padding: ds.sp.s + 'px ' + ds.sp.m + 'px',
-          background: 'color-mix(in oklab, ' + c.warn + ' 10%, transparent)',
-          border: '0.5px solid color-mix(in oklab, ' + c.warn + ' 30%, transparent)',
-          borderRadius: 8, fontSize: ds.fs.s, color: c.warn,
+          background: 'color-mix(in oklab, ' + (done ? c.success : c.warn) + ' 10%, transparent)',
+          border: '0.5px solid color-mix(in oklab, ' + (done ? c.success : c.warn) + ' 30%, transparent)',
+          borderRadius: 8, fontSize: ds.fs.s, color: done ? c.success : c.warn, lineHeight: 1.6,
         }}>
-          ⓘ 撤销服务（链上 Merkle 树）暂未在演示后端实现
+          {done
+            ? '✓ 已写入本地钱包撤销态（演示模式：链上 Merkle 树由文件 revocation_state.json 模拟）'
+            : 'ⓘ 演示模式：撤销态由钱包文件 revocation_state.json 模拟，下次派单时被 C++ verifier 真实拒绝'}
         </div>
+        {err && (
+          <div style={{
+            marginTop: ds.sp.s, padding: ds.sp.s + 'px ' + ds.sp.m + 'px',
+            background: 'color-mix(in oklab, ' + c.danger + ' 10%, transparent)',
+            border: '0.5px solid color-mix(in oklab, ' + c.danger + ' 30%, transparent)',
+            borderRadius: 8, fontSize: ds.fs.s, color: c.danger, fontFamily: ds.mono,
+          }}>错误：{err}</div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: ds.sp.s, marginTop: ds.sp.l }}>
-          <Btn kind="default" onClick={onClose}>关闭</Btn>
-          <Btn danger disabled>撤销服务暂未接入</Btn>
+          <Btn kind="default" onClick={onClose}>{done ? '关闭' : '取消'}</Btn>
+          {!done && (
+            <Btn danger disabled={busy} onClick={submit}>{busy ? '撤销中...' : '确认撤销'}</Btn>
+          )}
         </div>
       </div>
     </div>

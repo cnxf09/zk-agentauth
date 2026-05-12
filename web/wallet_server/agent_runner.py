@@ -119,16 +119,21 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
 
     try:
         # ── 1. Delegate ─────────────────────────────────────────
+        predicates = p.get("predicates") or []
+        revoked = bool(p.get("revoked"))
         task.emit("delegating",
                   message="Alice 创建委托 (P-256 ECDSA 签名)",
                   claims=p["claims"], agent_id=p["agent_id"],
-                  expires=p["expires"])
+                  expires=p["expires"], predicates=predicates,
+                  revoked=revoked)
         bins.alice_delegate(
             holder=holder_dir,
             claims=p["claims"],
             expires_iso=p["expires"],
             agent_id=p["agent_id"],
             out_dir=delegation_dir,
+            predicates=predicates,
+            revoked=revoked,
         )
         policy = json.loads((delegation_dir / "policy.json").read_text())
         agent_pkx = (delegation_dir / "agent_pkx.txt").read_text().strip()
@@ -138,9 +143,13 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
                   delegation_msg=(delegation_dir / "delegation_msg.txt").read_text().strip()[:42] + "...")
 
         # ── 2. Fetch reader request from TripGo ─────────────────
+        # Predicates must round-trip to the verifier so the reader request
+        # encodes the same `--predicate` flags the prover used; otherwise the
+        # zk circuit's predicate binding would mismatch.
         task.emit("fetching_request", message="向 TripGo 申请挑战 (reader request)")
         r = _HTTP.post(f"{tripgo_base}/api/agent/request",
-                       json={"claims": p["claims"]}, timeout=_HTTP_TIMEOUT)
+                       json={"claims": p["claims"], "predicates": predicates},
+                       timeout=_HTTP_TIMEOUT)
         r.raise_for_status()
         request_id = r.headers.get("X-Request-Id", "")
         request_dir.mkdir(exist_ok=True)
@@ -190,6 +199,7 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
             "checkin": p["checkin"],
             "checkout": p["checkout"],
             "claims": p["claims"],
+            "predicates": predicates,
             "agent_id": p["agent_id"],
             "task_id": task.id,
             "request_id": request_id,
