@@ -313,17 +313,12 @@ bool ReadDelegationDir(const std::filesystem::path& dir,
 }
 
 // ----------------------------------------------------------------
-// delegation_token.json 读写
+// public_delegation.json 读写
 // ----------------------------------------------------------------
 
-bool WriteDelegationTokenJson(const std::filesystem::path& path,
+bool WritePublicDelegationJson(const std::filesystem::path& path,
                               const std::string& agent_pkx_hex,
                               const std::string& agent_pky_hex,
-                              const std::string& del_msg_hex,
-                              const std::string& del_sig_hex,
-                              const std::string& agent_sig_hex,
-                              const std::string& device_pkx_hex,
-                              const std::string& device_pky_hex,
                               const Policy& policy,
                               std::string* err) {
   if (!EnsureDir(path.parent_path(), err)) return false;
@@ -332,11 +327,6 @@ bool WriteDelegationTokenJson(const std::filesystem::path& path,
   oss << "{\n";
   oss << "  \"agent_pkx\": \"" << agent_pkx_hex << "\",\n";
   oss << "  \"agent_pky\": \"" << agent_pky_hex << "\",\n";
-  oss << "  \"delegation_msg\": \"" << del_msg_hex << "\",\n";
-  oss << "  \"delegation_sig\": \"" << del_sig_hex << "\",\n";
-  oss << "  \"agent_sig\": \"" << agent_sig_hex << "\",\n";
-  oss << "  \"device_pkx\": \"" << device_pkx_hex << "\",\n";
-  oss << "  \"device_pky\": \"" << device_pky_hex << "\",\n";
   oss << "  \"policy\": {\n";
   oss << "    \"agent_id\": \"" << policy.agent_id << "\",\n";
   oss << "    \"allowed_claims\": [";
@@ -361,14 +351,9 @@ bool WriteDelegationTokenJson(const std::filesystem::path& path,
   return out.good();
 }
 
-bool ReadDelegationTokenJson(const std::filesystem::path& path,
+bool ReadPublicDelegationJson(const std::filesystem::path& path,
                              std::string* agent_pkx_hex,
                              std::string* agent_pky_hex,
-                             std::string* del_msg_hex,
-                             std::string* del_sig_hex,
-                             std::string* agent_sig_hex,
-                             std::string* device_pkx_hex,
-                             std::string* device_pky_hex,
                              Policy* policy,
                              std::string* err) {
   std::ifstream in(path);
@@ -381,11 +366,6 @@ bool ReadDelegationTokenJson(const std::filesystem::path& path,
 
   *agent_pkx_hex  = ExtractJsonString(json, "agent_pkx");
   *agent_pky_hex  = ExtractJsonString(json, "agent_pky");
-  *del_msg_hex    = ExtractJsonString(json, "delegation_msg");
-  *del_sig_hex    = ExtractJsonString(json, "delegation_sig");
-  *agent_sig_hex   = ExtractJsonString(json, "agent_sig");
-  *device_pkx_hex = ExtractJsonString(json, "device_pkx");
-  *device_pky_hex = ExtractJsonString(json, "device_pky");
 
   policy->agent_id        = ExtractJsonString(json, "agent_id");
   policy->expires         = ExtractJsonString(json, "expires");
@@ -393,9 +373,9 @@ bool ReadDelegationTokenJson(const std::filesystem::path& path,
   policy->allowed_claims  = ExtractJsonStringArray(json, "allowed_claims");
   policy->predicates      = ExtractPredicates(json);
 
-  if (agent_pkx_hex->empty() || del_sig_hex->empty() ||
-      agent_sig_hex->empty()) {
-    if (err != nullptr) *err = "delegation_token.json missing required fields";
+  if (agent_pkx_hex->empty() || agent_pky_hex->empty() ||
+      policy->expires.empty()) {
+    if (err != nullptr) *err = "public_delegation.json missing required fields";
     return false;
   }
   return true;

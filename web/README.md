@@ -85,7 +85,7 @@ make demo         # 等价 ./start.sh
 ## 篡改演示（验证安全性）
 
 ```bash
-# 替换某个委托签名字节，证明 delegation_sig 校验会失败
+# 替换 Wallet/Agent 本地委托签名字节，证明无效委托无法生成有效 proof
 python3 -c "
 from pathlib import Path
 for f in Path('data/wallet/tasks').glob('*/delegation/delegation_sig.txt'):
@@ -93,7 +93,7 @@ for f in Path('data/wallet/tasks').glob('*/delegation/delegation_sig.txt'):
     f.write_text(s[:5] + ('a' if s[5]!='a' else 'b') + s[6:])
     print('tampered:', f); break
 "
-# 再发一次消息派单 → 五阶段会到 ④ posting 后被 TripGo 校验失败：delegation_sig: FAIL
+# 对被篡改的 delegation 重新 present 会失败；presentation zip 不再发送 delegation_sig 明文。
 ```
 
 ## API 速查

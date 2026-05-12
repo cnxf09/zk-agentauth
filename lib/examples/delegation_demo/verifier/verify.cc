@@ -63,14 +63,12 @@ bool RunDelegationVerifyCommand(
     return false;
   }
 
-  // 1. 读取 delegation_token.json
-  std::string agent_pkx, agent_pky, del_msg, del_sig, agent_sig;
-  std::string device_pkx, device_pky;
+  // 1. 读取 verifier 需要的公开委托输入。签名明文和 device 公钥已经作为
+  // ZK witness 进入 proof，Verifier 不再从 sidecar JSON 读取它们。
+  std::string agent_pkx, agent_pky;
   Policy policy;
-  if (!ReadDelegationTokenJson(presentation_dir / "delegation_token.json",
-                               &agent_pkx, &agent_pky, &del_msg, &del_sig,
-                               &agent_sig, &device_pkx, &device_pky, &policy,
-                               err)) {
+  if (!ReadPublicDelegationJson(presentation_dir / "public_delegation.json",
+                                &agent_pkx, &agent_pky, &policy, err)) {
     return false;
   }
 
@@ -110,18 +108,13 @@ bool RunDelegationVerifyCommand(
   const bool predicates_ok =
       EvaluatePolicyPredicates(policy, presentation.disclosed_claims,
                                &predicate_err);
-  std::string revocation_err;
-  const bool revocation_ok = VerifyDelegationRevocationStatus(
-      revocation_status, device_pkx, device_pky, del_msg, request.now_iso8601,
-      &revocation_err);
-
   // 约束⑦-⑪已进入 ZK 电路；下面的布尔项用于保持 CLI 展示格式。
   result->zk_proof_ok = zk_result.ok;
   result->delegation_sig_ok = zk_result.ok;
   result->policy_claims_ok = zk_result.ok && predicates_ok;
   result->policy_not_expired = zk_result.ok;
-  result->delegation_revocation_ok = revocation_ok;
-  result->overall_ok = zk_result.ok && predicates_ok && revocation_ok;
+  result->delegation_revocation_ok = zk_result.ok;
+  result->overall_ok = zk_result.ok && predicates_ok;
 
   std::ostringstream msg;
   msg << "ZK proof: " << (result->zk_proof_ok ? "PASS" : "FAIL") << "\n";
@@ -138,9 +131,6 @@ bool RunDelegationVerifyCommand(
       << (result->policy_not_expired ? "PASS" : "FAIL") << "\n";
   msg << "Delegation revocation: "
       << (result->delegation_revocation_ok ? "PASS" : "FAIL");
-  if (!revocation_ok) {
-    msg << " (" << revocation_err << ")";
-  }
   msg << "\n";
   msg << "Overall: " << (result->overall_ok ? "ACCEPT" : "REJECT");
   result->message = msg.str();

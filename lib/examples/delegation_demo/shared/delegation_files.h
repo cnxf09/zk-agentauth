@@ -54,28 +54,20 @@ bool ReadDelegationDir(const std::filesystem::path& dir,
                        Policy* policy,
                        std::string* err);
 
-// ---- delegation_token.json 读写 ----
-// Module C 写出，Module D 读入
+// ---- public_delegation.json 读写 ----
+// Module C 写出，Module D 读入。只包含 verifier 需要的公开输入；
+// device public key、delegation signature、agent signature 等材料留在
+// prover witness / 本地 delegation 目录中，不随 presentation 发送。
 
-bool WriteDelegationTokenJson(const std::filesystem::path& path,
+bool WritePublicDelegationJson(const std::filesystem::path& path,
                               const std::string& agent_pkx_hex,
                               const std::string& agent_pky_hex,
-                              const std::string& del_msg_hex,
-                              const std::string& del_sig_hex,
-                              const std::string& agent_sig_hex,
-                              const std::string& device_pkx_hex,
-                              const std::string& device_pky_hex,
                               const Policy& policy,
                               std::string* err);
 
-bool ReadDelegationTokenJson(const std::filesystem::path& path,
+bool ReadPublicDelegationJson(const std::filesystem::path& path,
                              std::string* agent_pkx_hex,
                              std::string* agent_pky_hex,
-                             std::string* del_msg_hex,
-                             std::string* del_sig_hex,
-                             std::string* agent_sig_hex,
-                             std::string* device_pkx_hex,
-                             std::string* device_pky_hex,
                              Policy* policy,
                              std::string* err);
 

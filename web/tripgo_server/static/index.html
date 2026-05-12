@@ -697,7 +697,7 @@ function AgentMonitor({ go }) {
 
   const fmtTs = ts => ts ? new Date(ts*1000).toISOString().slice(11,19)+'Z' : '--:--:--';
 
-  const tok = incoming?.delegation_token || {};
+  const publicDelegation = incoming?.public_delegation || {};
   const checks = verified?.checks || {};
   const checkOf = (k) => {
     const v = checks[k];
@@ -741,13 +741,11 @@ function AgentMonitor({ go }) {
                 {'  '}<span className="ck">"hotel_id"</span><span className="cp">: </span><span className="ch">{incoming.hotel_id}</span><span className="cp">,</span>{'\n'}
                 {'  '}<span className="ck">"claims"</span><span className="cp">: [</span>{(incoming.claims||[]).map((c,i,a)=>(<React.Fragment key={c}><span className="cs">"{c}"</span>{i<a.length-1 && <span className="cp">, </span>}</React.Fragment>))}<span className="cp">],</span>{'\n'}
                 {'  '}<span className="ck">"proof_size"</span><span className="cp">: </span><span className="ch">{incoming.proof_size}</span><span className="cp">,</span>{'\n'}
-                {'  '}<span className="ck">"agent_pkx"</span><span className="cp">: </span><span className="ch">"{(tok.agent_pkx||'').slice(0,38)}..."</span><span className="cp">,</span>{'\n'}
-                {'  '}<span className="ck">"device_pkx"</span><span className="cp">: </span><span className="ch">"{(tok.device_pkx||'').slice(0,38)}..."</span><span className="cp">,</span>{'\n'}
-                {'  '}<span className="ck">"delegation_msg"</span><span className="cp">: </span><span className="ch">"{(tok.delegation_msg||'').slice(0,38)}..."</span><span className="cp">,</span>{'\n'}
-                {'  '}<span className="ck">"delegation_sig"</span><span className="cp">: </span><span className="ch">"{(tok.delegation_sig||'').slice(0,38)}..."</span><span className="cp">,</span>{'\n'}
+                {'  '}<span className="ck">"agent_pkx"</span><span className="cp">: </span><span className="ch">"{(publicDelegation.agent_pkx||'').slice(0,38)}..."</span><span className="cp">,</span>{'\n'}
+                {'  '}<span className="ck">"privacy"</span><span className="cp">: </span><span className="cs">"device key and signatures hidden in ZK witness"</span><span className="cp">,</span>{'\n'}
                 {'  '}<span className="ck">"policy"</span><span className="cp">: {'{'}</span>{'\n'}
-                {'    '}<span className="ck">"allowed_claims"</span><span className="cp">: [</span>{(tok.policy?.allowed_claims||[]).map((c,i,a)=>(<React.Fragment key={c}><span className="cs">"{c}"</span>{i<a.length-1 && <span className="cp">, </span>}</React.Fragment>))}<span className="cp">],</span>{'\n'}
-                {'    '}<span className="ck">"expires"</span><span className="cp">: </span><span className="cs">"{tok.policy?.expires||''}"</span>{'\n'}
+                {'    '}<span className="ck">"allowed_claims"</span><span className="cp">: [</span>{(publicDelegation.policy?.allowed_claims||[]).map((c,i,a)=>(<React.Fragment key={c}><span className="cs">"{c}"</span>{i<a.length-1 && <span className="cp">, </span>}</React.Fragment>))}<span className="cp">],</span>{'\n'}
+                {'    '}<span className="ck">"expires"</span><span className="cp">: </span><span className="cs">"{publicDelegation.policy?.expires||''}"</span>{'\n'}
                 {'  '}<span className="cp">{'}'}</span>{'\n'}
                 <span className="cp">{'}'}</span>
               </div>

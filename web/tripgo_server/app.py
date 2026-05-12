@@ -191,12 +191,13 @@ def agent_order():
     if not request_dir.exists():
         return jsonify({"error": f"request_id {request_id} not found"}), 400
 
-    # Read delegation token (for feed display)
-    token_path = presentation_dir / "delegation_token.json"
-    delegation_token = {}
-    if token_path.exists():
+    # Read public delegation input for feed display. Sensitive witness/debug
+    # material is intentionally not part of the uploaded presentation.
+    public_delegation_path = presentation_dir / "public_delegation.json"
+    public_delegation = {}
+    if public_delegation_path.exists():
         try:
-            delegation_token = json.loads(token_path.read_text())
+            public_delegation = json.loads(public_delegation_path.read_text())
         except Exception:
             pass
     proof_size = (presentation_dir / "proof.bin").stat().st_size if (presentation_dir / "proof.bin").exists() else 0
@@ -207,7 +208,7 @@ def agent_order():
                  claims=claims,
                  agent_id=order_req.get("agent_id"),
                  proof_size=proof_size,
-                 delegation_token=delegation_token,
+                 public_delegation=public_delegation,
                  task_id=order_req.get("task_id"))
 
     # Run verifier

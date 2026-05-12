@@ -41,6 +41,11 @@ bool WriteDelegationRevocationStatusJson(
     const DelegationRevocationStatus& status,
     std::string* err);
 
+bool WritePublicDelegationRevocationStatusJson(
+    const std::filesystem::path& path,
+    const DelegationRevocationStatus& status,
+    std::string* err);
+
 bool ReadDelegationRevocationStatusJson(
     const std::filesystem::path& path,
     DelegationRevocationStatus* status,

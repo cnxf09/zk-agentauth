@@ -166,15 +166,19 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
         )
         proof_path = presentation_dir / "proof.bin"
         proof_size = proof_path.stat().st_size if proof_path.exists() else 0
-        token_path = presentation_dir / "delegation_token.json"
-        del_token = json.loads(token_path.read_text()) if token_path.exists() else {}
+        public_delegation_path = presentation_dir / "public_delegation.json"
+        public_delegation = (
+            json.loads(public_delegation_path.read_text())
+            if public_delegation_path.exists()
+            else {}
+        )
         task.emit("proven",
                   proof_size=proof_size,
                   presentation_files=sorted(os.listdir(presentation_dir)),
-                  delegation_token=del_token)
+                  public_delegation=public_delegation)
 
         # ── 4. Post to TripGo ───────────────────────────────────
-        task.emit("posting", message="向 TripGo 投递 ZK presentation + delegation token")
+        task.emit("posting", message="向 TripGo 投递 ZK presentation + public delegation")
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as z:
             for f in sorted(presentation_dir.iterdir()):

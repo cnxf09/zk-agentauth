@@ -238,6 +238,33 @@ bool WriteDelegationRevocationStatusJson(
   return out.good();
 }
 
+bool WritePublicDelegationRevocationStatusJson(
+    const std::filesystem::path& path,
+    const DelegationRevocationStatus& status,
+    std::string* err) {
+  std::error_code ec;
+  std::filesystem::create_directories(path.parent_path(), ec);
+  if (ec) {
+    if (err != nullptr) {
+      *err = "failed to create directory: " + path.parent_path().string() +
+             ": " + ec.message();
+    }
+    return false;
+  }
+  std::ofstream out(path, std::ios::trunc);
+  if (!out) {
+    if (err != nullptr) *err = "failed to open: " + path.string();
+    return false;
+  }
+  out << "{\n";
+  out << "  \"delegation_id\": \"" << status.delegation_id_hex << "\",\n";
+  out << "  \"epoch\": " << status.epoch << ",\n";
+  out << "  \"expires\": \"" << status.expires << "\",\n";
+  out << "  \"revoked\": " << (status.revoked ? "true" : "false") << "\n";
+  out << "}\n";
+  return out.good();
+}
+
 bool ReadDelegationRevocationStatusJson(
     const std::filesystem::path& path,
     DelegationRevocationStatus* status,
@@ -254,8 +281,7 @@ bool ReadDelegationRevocationStatusJson(
   status->sig_hex = ExtractJsonString(json, "sig");
   if (!ExtractJsonUint64(json, "epoch", &status->epoch) ||
       !ExtractJsonBool(json, "revoked", &status->revoked) ||
-      status->delegation_id_hex.empty() || status->expires.empty() ||
-      status->sig_hex.empty()) {
+      status->delegation_id_hex.empty() || status->expires.empty()) {
     if (err != nullptr) {
       *err = "delegation_revocation_status.json missing required fields";
     }

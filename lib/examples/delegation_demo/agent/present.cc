@@ -160,15 +160,13 @@ bool RunAgentPresentCommand(const std::filesystem::path& delegation_dir,
     return false;
   }
 
-  // 8. 写出 delegation_token.json（供 Verifier 读取）
-  if (!WriteDelegationTokenJson(out_dir / "delegation_token.json",
-                                agent_pkx, agent_pky, del_msg, del_sig,
-                                agent_sig,
-                                holder.device_pkx_hex, holder.device_pky_hex,
-                                policy, err)) {
+  // 8. 写出 verifier 需要的公开委托输入。device 公钥、委托签名和
+  // Agent 签名只作为 witness / 本地材料存在，不随 presentation 发送。
+  if (!WritePublicDelegationJson(out_dir / "public_delegation.json",
+                                 agent_pkx, agent_pky, policy, err)) {
     return false;
   }
-  if (!WriteDelegationRevocationStatusJson(
+  if (!WritePublicDelegationRevocationStatusJson(
           out_dir / "delegation_revocation_status.json",
           revocation_status, err)) {
     return false;
