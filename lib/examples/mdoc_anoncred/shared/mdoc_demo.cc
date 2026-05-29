@@ -356,6 +356,7 @@ bool BuildReaderRequest(const MdocIssuerPublicBundle& issuer_public,
                                           &request->nonce_hex, err)) {
     return false;
   }
+  request->state = request->nonce_hex;
 
   const ZkSpecStruct& spec = request->num_attributes == 1 ? kZkSpecs[0] : kZkSpecs[1];
   uint8_t* circuit = nullptr;
@@ -404,6 +405,7 @@ bool BuildDelegatedReaderRequest(const MdocIssuerPublicBundle& issuer_public,
                                           &request->nonce_hex, err)) {
     return false;
   }
+  request->state = request->nonce_hex;
 
   const ZkSpecStruct& spec = request->num_attributes == 1 ? kZkSpecs[0] : kZkSpecs[1];
   uint8_t* circuit = nullptr;

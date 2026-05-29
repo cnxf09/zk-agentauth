@@ -94,6 +94,45 @@ bool ExpectUnsigned(const std::vector<uint8_t>& doc, const CborDoc* parent,
   return true;
 }
 
+std::string JsonEscape(const std::string& s) {
+  std::ostringstream out;
+  for (const unsigned char ch : s) {
+    switch (ch) {
+      case '"':
+        out << "\\\"";
+        break;
+      case '\\':
+        out << "\\\\";
+        break;
+      case '\b':
+        out << "\\b";
+        break;
+      case '\f':
+        out << "\\f";
+        break;
+      case '\n':
+        out << "\\n";
+        break;
+      case '\r':
+        out << "\\r";
+        break;
+      case '\t':
+        out << "\\t";
+        break;
+      default:
+        if (ch < 0x20) {
+          out << "\\u00";
+          const char* hex = "0123456789abcdef";
+          out << hex[(ch >> 4) & 0x0f] << hex[ch & 0x0f];
+        } else {
+          out << static_cast<char>(ch);
+        }
+        break;
+    }
+  }
+  return out.str();
+}
+
 }  // namespace
 
 bool GenerateOpenId4VpSessionTranscript(std::vector<uint8_t>* transcript,
@@ -119,18 +158,47 @@ bool GenerateOpenId4VpSessionTranscript(std::vector<uint8_t>* transcript,
 
 std::string BuildOpenId4VpRequestJson(const ReaderRequest& request) {
   std::ostringstream out;
+  const std::string state =
+      request.state.empty() ? request.nonce_hex : request.state;
   out << "{\n"
       << "  \"response_type\": \"vp_token\",\n"
-      << "  \"client_id\": \"" << request.client_id << "\",\n"
-      << "  \"response_uri\": \"" << request.response_uri << "\",\n"
-      << "  \"nonce\": \"" << request.nonce_hex << "\",\n"
-      << "  \"doc_type\": \"" << request.doc_type << "\",\n"
+      << "  \"client_id\": \"" << JsonEscape(request.client_id) << "\",\n"
+      << "  \"response_mode\": \"direct_post\",\n"
+      << "  \"response_uri\": \"" << JsonEscape(request.response_uri) << "\",\n"
+      << "  \"nonce\": \"" << JsonEscape(request.nonce_hex) << "\",\n"
+      << "  \"state\": \"" << JsonEscape(state) << "\",\n"
+      << "  \"doc_type\": \"" << JsonEscape(request.doc_type) << "\",\n"
+      << "  \"presentation_definition\": {\n"
+      << "    \"id\": \"zkaa-mdoc-presentation\",\n"
+      << "    \"input_descriptors\": [\n"
+      << "      {\n"
+      << "        \"id\": \"zkaa-ligero-presentation\",\n"
+      << "        \"name\": \"ZK-AgentAuth delegated presentation\",\n"
+      << "        \"format\": {\"zkaa+ligero\": {\"alg\": [\"P-256+Ligero\"]}},\n"
+      << "        \"constraints\": {\n"
+      << "          \"fields\": [\n";
+  for (size_t i = 0; i < request.claims.size(); ++i) {
+    const ReaderClaim& claim = request.claims[i];
+    out << "            {\"id\": \"claim-" << JsonEscape(claim.alias)
+        << "\", \"path\": [\"$.claims." << JsonEscape(claim.alias)
+        << "\", \"$.disclosed_claims[?(@.alias=='" << JsonEscape(claim.alias)
+        << "')]\"], \"purpose\": \"Prove " << JsonEscape(claim.alias) << "\"}";
+    if (i + 1 != request.claims.size()) {
+      out << ",";
+    }
+    out << "\n";
+  }
+  out << "          ]\n"
+      << "        }\n"
+      << "      }\n"
+      << "    ]\n"
+      << "  },\n"
       << "  \"claims\": [\n";
   for (size_t i = 0; i < request.claims.size(); ++i) {
     const ReaderClaim& claim = request.claims[i];
-    out << "    {\"alias\": \"" << claim.alias << "\", "
-        << "\"namespace\": \"" << claim.namespace_id << "\", "
-        << "\"element_identifier\": \"" << claim.element_id << "\"}";
+    out << "    {\"alias\": \"" << JsonEscape(claim.alias) << "\", "
+        << "\"namespace\": \"" << JsonEscape(claim.namespace_id) << "\", "
+        << "\"element_identifier\": \"" << JsonEscape(claim.element_id) << "\"}";
     if (i + 1 != request.claims.size()) {
       out << ",";
     }
@@ -150,7 +218,7 @@ bool EncodeReaderRequestCbor(const ReaderRequest& request,
     return false;
   }
   out->clear();
-  AppendMajorAndCount(out, 5, 11);
+  AppendMajorAndCount(out, 5, 12);
 
   AppendText(out, "zkSystem");
   AppendText(out, request.zk_system);
@@ -172,6 +240,8 @@ bool EncodeReaderRequestCbor(const ReaderRequest& request,
   AppendText(out, request.response_uri);
   AppendText(out, "nonceHex");
   AppendText(out, request.nonce_hex);
+  AppendText(out, "state");
+  AppendText(out, request.state.empty() ? request.nonce_hex : request.state);
   AppendText(out, "claims");
   AppendMajorAndCount(out, 4, request.claims.size());
   for (const ReaderClaim& claim : request.claims) {
@@ -225,6 +295,9 @@ bool DecodeReaderRequestCbor(const std::vector<uint8_t>& encoded,
       *err = "reader_request.cbor missing required fields";
     }
     return false;
+  }
+  if (!ExpectText(encoded, &root, "state", &request->state)) {
+    request->state = request->nonce_hex;
   }
   size_t ndx = 0;
   const CborDoc* claims_key =

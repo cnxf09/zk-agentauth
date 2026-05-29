@@ -17,9 +17,13 @@
 /web/data/wallet/holder/
 /web/data/wallet/delegation/
 /web/data/wallet/tasks/
+/web/data/wallet/oauth_grants/
+/web/data/wallet/oauth_tokens/
+/web/data/wallet/oidc_signing_key.pem
 /web/data/shared/issuer_public/
 /web/data/tripgo/orders.json
 /web/data/tripgo/tasks/
+/web/data/tripgo/oid4vp_verifier_signing_key.pem
 
 # OS / editor
 .DS_Store
@@ -27,3 +31,5 @@
 .vscode/
 *.swp
 *~
+run_cli_tests.sh
+run_cli_tests.sh

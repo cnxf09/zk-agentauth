@@ -47,6 +47,7 @@ struct ReaderRequest {
   std::string client_id;
   std::string response_uri;
   std::string nonce_hex;
+  std::string state;
   std::vector<uint8_t> request_cbor;
   std::string openid4vp_request_json;
   std::vector<ReaderClaim> claims;

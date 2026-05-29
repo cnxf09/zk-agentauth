@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zk-agentauth.local/schemas/agent-delegation.schema.json",
+  "title": "ZK-AgentAuth Agent Delegation Authorization Details",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "agent_id", "allowed_claims", "expires"],
+  "properties": {
+    "type": {
+      "const": "https://zk-agentauth.local/authorization/agent-delegation"
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "allowed_claims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "predicates": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "expires": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verifier": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "allowed_scopes": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "actions": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "hotel_id": {
+      "type": ["integer", "string"]
+    },
+    "checkin": {
+      "type": "string",
+      "format": "date"
+    },
+    "checkout": {
+      "type": "string",
+      "format": "date"
+    },
+    "max_amount": {
+      "type": "number",
+      "minimum": 0
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
