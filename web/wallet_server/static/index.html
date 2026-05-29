@@ -31,6 +31,17 @@
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext } = React;
+function localISODateOffset(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function defaultStayDates() {
+  return { checkin: localISODateOffset(1), checkout: localISODateOffset(3) };
+}
 // ===== app-data.jsx =====
 // app-data.jsx — mock data for ZK-AgentAuth client
 
@@ -1276,11 +1287,12 @@ function AgentChat({ agentId, onBack, onNewDelegation, onDispatch }) {
         if (!isNaN(d.getTime())) expires = d.toISOString().slice(0, 19) + 'Z';
       }
       if (!expires) expires = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19) + 'Z';
+      const stay = defaultStayDates();
       const r = await fetch('/api/agent/dispatch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           hotel_id: hotel.id,
-          checkin: '2026-05-10', checkout: '2026-05-12',
+          checkin: stay.checkin, checkout: stay.checkout,
           claims: claimsToProve, expires, agent_id: agentId,
         }),
       });
@@ -2754,9 +2766,9 @@ function SettingsPanel() {
 // ═══ Real Dispatch Overlay (SSE-based 5-phase progress) ══════════
 const PHASE_MAP = {
   delegating:       { lbl: '① Alice 签发委托', det: '生成 P-256 委托签名 + policy.json' },
-  fetching_request: { lbl: '② 向 TripGo 申请挑战', det: 'POST /api/agent/request → 取回 reader_request.cbor' },
+  fetching_request: { lbl: '② 向 TripGo 申请挑战', det: 'POST /oid4vp/request → 取回 OID4VP request' },
   proving:          { lbl: '③ 生成 ZK 证明', det: 'Ligero v2 · 哈希 + 签名约束 · 约 5s' },
-  posting:          { lbl: '④ 投递订单', det: 'POST /api/agent/order (multipart) → 跨服务调用 TripGo' },
+  posting:          { lbl: '④ 投递订单', det: 'POST /oid4vp/response (direct_post) → 跨服务调用 TripGo' },
   done:             { lbl: '⑤ 完成', det: 'TripGo 完成 4 项校验 → 订单入库' },
 };
 const PHASE_ORDER = ['delegating', 'fetching_request', 'proving', 'posting', 'done'];
@@ -3128,11 +3140,12 @@ function App() {
       const hs = await (await fetch('/api/catalog')).json();
       const hotel = Array.isArray(hs) && hs.length > 0 ? hs[0] : { id: 'hotel-001', name: 'TripGo' };
       const expires = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19) + 'Z';
+      const stay = defaultStayDates();
       const r = await fetch('/api/agent/dispatch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           hotel_id: hotel.id,
-          checkin: '2026-05-10', checkout: '2026-05-12',
+          checkin: stay.checkin, checkout: stay.checkout,
           claims: (inb && inb.requiredClaims) || ['age_over_18'],
           expires, agent_id: 'tripgo-agent',
         }),

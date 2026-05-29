@@ -208,6 +208,17 @@
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useCallback } = React;
+function localISODateOffset(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function defaultStayDates() {
+  return { checkin: localISODateOffset(1), checkout: localISODateOffset(3) };
+}
 
 let HOTELS = [];
 async function loadCatalog() {
@@ -544,6 +555,7 @@ function HumanCatalog({ go, onSel }) {
 // ===== Human Detail =====
 function HumanDetail({ go, hotel, setOrder }) {
   if(!hotel) return null;
+  const stay = defaultStayDates();
   const total = hotel.price*2;
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -554,7 +566,7 @@ function HumanDetail({ go, hotel, setOrder }) {
     try {
       const r = await fetch('/api/order/human', {
         method: 'POST', headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ hotel_id: hotel.id, contact_name: name, phone, checkin: '2026-05-10', checkout: '2026-05-12' })
+        body: JSON.stringify({ hotel_id: hotel.id, contact_name: name, phone, checkin: stay.checkin, checkout: stay.checkout })
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const order = await r.json();
@@ -597,11 +609,11 @@ function HumanDetail({ go, hotel, setOrder }) {
             <div className="form-row2">
               <div className="form-grp">
                 <label className="form-lbl">入住日期</label>
-                <input className="form-inp" defaultValue="2026-05-10" readOnly/>
+                <input className="form-inp" value={stay.checkin} readOnly/>
               </div>
               <div className="form-grp">
                 <label className="form-lbl">离店日期</label>
-                <input className="form-inp" defaultValue="2026-05-12" readOnly/>
+                <input className="form-inp" value={stay.checkout} readOnly/>
               </div>
             </div>
             <div className="form-grp">

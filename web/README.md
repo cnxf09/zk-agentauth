@@ -68,9 +68,9 @@ make demo         # 等价 ./start.sh
 1. http://localhost:8002 → 「Agent」→「购书助手」 → 输入「帮我订外滩璞丽酒店」 → 发送
 2. 弹出 ProvingOverlay → 实时观察 5 阶段时间线 + Prover 实时日志：
    - ① delegating · 生成 P-256 委托签名 + delegation_revocation_status.json
-   - ② fetching_request · 跨服务 POST :8003/api/agent/request 取挑战
+   - ② fetching_request · 跨服务 POST :8003/oid4vp/request 取 OID4VP 展示请求
    - ③ proving · 生成 Ligero v2 ZK 证明（~5 秒），proof.bin 实际尺寸（~350 KB）回填
-   - ④ posting · multipart 投递 :8003/api/agent/order
+   - ④ posting · direct_post 投递 :8003/oid4vp/response
    - ⑤ done · 校验全 PASS，订单入库
 3. **同时** 切到 :8003 的 Live Monitor，看到刚才的 Agent 流量实时进入：JSON 解析、四步验证动画、订单卡片
 4. 钱包侧得到一张 VERIFIED 印章 + 订单详情卡
@@ -105,11 +105,114 @@ for f in Path('data/wallet/tasks').glob('*/delegation/delegation_sig.txt'):
 | GET  | `/` | Client UI |
 | GET  | `/api/wallet/status` | 凭证状态 + 持有 claims |
 | POST | `/api/wallet/reissue` | 强制重发 mDoc |
+| GET  | `/.well-known/openid-configuration` | OIDC discovery，暴露 issuer、authorization/token endpoint、JWKS 地址和支持能力 |
+| GET  | `/jwks.json` | OIDC RS256 签名公钥 JWKS |
+| GET/POST | `/userinfo` | Bearer access token 用户信息端点，要求 `openid` scope |
+| GET  | `/schemas/agent-delegation.schema.json` | `authorization_details` 的 Agent 委托 JSON Schema |
+| GET  | `/profiles/vp-token/zkaa-ligero-v1` | `zkaa+ligero` VP Token profile markdown |
+| GET/POST | `/oauth/authorize` | OIDC/OAuth 风格授权页，校验 client/redirect_uri/state/PKCE/CSRF，解析 `authorization_details` 并生成 authorization code |
+| POST | `/oauth/token` | authorization_code 交换，校验 PKCE，code 5 分钟过期且一次性使用，写入 access token store，返回 `access_token`、RS256 `id_token`、`authorization_details`、`agent_policy` |
 | GET  | `/api/catalog` | 代理 :8003/api/catalog |
-| POST | `/api/agent/dispatch` | 派 Agent，body: `{hotel_id, claims, expires, agent_id}` → `{task_id}` |
+| POST | `/api/agent/dispatch` | 派 Agent，body 可直接给 `{hotel_id, claims, expires, agent_id}`，也可用 `authorization_details` 承载委托策略 |
 | GET  | `/api/agent/task/<id>/stream` | SSE：阶段进度（事件名为阶段名） |
 | GET  | `/api/agent/task/<id>` | 任务最终态 |
 | GET  | `/api/agent/history` | 最近任务列表 |
+
+`authorization_details` 示例：
+
+```json
+[
+  {
+    "type": "https://zk-agentauth.local/authorization/agent-delegation",
+    "agent_id": "tripgo-agent",
+    "allowed_claims": ["age_over_18"],
+    "predicates": ["age_over_18:GE:18"],
+    "expires": "2027-01-01T00:00:00Z",
+    "verifier": "tripgo",
+    "allowed_scopes": ["hotel.book"]
+  }
+]
+```
+
+OAuth demo 注册了一个客户端白名单：
+
+```text
+client_id: tripgo-web
+redirect_uri:
+  - http://localhost:8003/oauth/callback
+  - http://127.0.0.1:8003/oauth/callback
+PKCE: required, S256 only
+state: required
+authorization code: 5 minutes, one-time use
+access token: stored server-side, 10 minutes, Bearer token scope checked by /userinfo
+id_token: RS256 signed, public key at /jwks.json
+authorization_details type: https://zk-agentauth.local/authorization/agent-delegation
+authorization_details schema: http://localhost:8002/schemas/agent-delegation.schema.json
+```
+
+生成带 PKCE 的授权页 URL：
+
+```bash
+python3 - <<'PY'
+import base64, hashlib, json, secrets, urllib.parse
+
+code_verifier = secrets.token_urlsafe(48)
+code_challenge = base64.urlsafe_b64encode(
+    hashlib.sha256(code_verifier.encode("ascii")).digest()
+).rstrip(b"=").decode("ascii")
+authorization_details = [{
+    "type": "https://zk-agentauth.local/authorization/agent-delegation",
+    "agent_id": "tripgo-agent",
+    "allowed_claims": ["age_over_18"],
+    "predicates": ["age_over_18:GE:18"],
+    "expires": "2027-01-01T00:00:00Z",
+    "verifier": "tripgo",
+    "allowed_scopes": ["hotel.book"],
+}]
+params = {
+    "response_type": "code",
+    "client_id": "tripgo-web",
+    "redirect_uri": "http://localhost:8003/oauth/callback",
+    "scope": "openid agent.delegate",
+    "state": secrets.token_urlsafe(16),
+    "nonce": secrets.token_urlsafe(16),
+    "authorization_details": json.dumps(authorization_details, separators=(",", ":")),
+    "code_challenge": code_challenge,
+    "code_challenge_method": "S256",
+}
+print("open:", "http://localhost:8002/oauth/authorize?" + urllib.parse.urlencode(params))
+print("save code_verifier:", code_verifier)
+PY
+```
+
+授权页批准后会跳转到 `redirect_uri?code=...&state=...`。用上一步保存的 `code_verifier` 换 token：
+
+```bash
+curl --noproxy '*' -X POST http://localhost:8002/oauth/token \
+  -d grant_type=authorization_code \
+  -d client_id=tripgo-web \
+  -d redirect_uri=http://localhost:8003/oauth/callback \
+  -d code='PASTE_CODE_HERE' \
+  -d code_verifier='PASTE_CODE_VERIFIER_HERE'
+```
+
+再用返回的 `access_token` 调 `/userinfo`：
+
+```bash
+curl --noproxy '*' http://localhost:8002/userinfo \
+  -H 'Authorization: Bearer PASTE_ACCESS_TOKEN_HERE'
+```
+
+`/api/agent/dispatch` 若收到同一份 `authorization_details`，会从中提取 `allowed_claims`、`predicates`、`expires`、`agent_id` 作为 Agent 委托策略，并继续走 `/oid4vp/request` → `/oid4vp/response`。
+
+OIDC discovery:
+
+```bash
+curl --noproxy '*' http://localhost:8002/.well-known/openid-configuration
+curl --noproxy '*' http://localhost:8002/jwks.json
+curl --noproxy '*' http://localhost:8002/schemas/agent-delegation.schema.json
+curl --noproxy '*' http://localhost:8002/profiles/vp-token/zkaa-ligero-v1
+```
 
 ### TripGo Server (8003)
 
@@ -120,9 +223,115 @@ for f in Path('data/wallet/tasks').glob('*/delegation/delegation_sig.txt'):
 | POST | `/api/order/human` | 真人下单（无 ZK） |
 | POST | `/api/agent/request` | 内部：颁发 reader request（zip） |
 | POST | `/api/agent/order` | 接收 Agent 投递 (multipart) → 调 verifier → SSE 广播 |
+| GET  | `/.well-known/oid4vp-verifier` | TripGo OID4VP verifier metadata，暴露 JWKS、direct_post endpoint 与 `zkaa+ligero` 支持能力 |
+| GET  | `/oid4vp/jwks.json` | TripGo verifier request object RS256 签名公钥 |
+| GET  | `/profiles/vp-token/zkaa-ligero-v1` | `zkaa+ligero` VP Token profile markdown |
+| GET/POST | `/oid4vp/request` | OID4VP 风格请求对象，返回 `{request_id,state,request,request_object_jwt,reader_request_zip_b64}` |
+| POST | `/oid4vp/response` | OID4VP `direct_post` 风格响应，body 内含 `vp_token.presentation_zip_b64` |
 | GET  | `/api/agent/feed` | SSE：Live Monitor 流量推送 |
 | GET  | `/api/agent/feed/history` | feed 历史（in-memory，重启清零） |
 | GET  | `/api/orders/<id>` | 订单详情 |
+
+`/oid4vp/request` 仍复用 `delegation_demo_verifier request` 生成现有 `reader_request.cbor` / `session_transcript.cbor`，外层补上 `client_id`、`response_mode=direct_post`、`state`、`presentation_definition`、`client_metadata_uri` 等字段，并生成 RS256 JWS `request_object_jwt`。请求体也可传 `authorization_details`；TripGo 会从其中派生 `claims/predicates` 并写入 request object 与 metadata。`reader_request_zip_b64` 是当前原型给 prover 复用旧目录格式的兼容扩展。
+
+`zkaa+ligero` VP Token profile：
+
+```text
+profile: https://zk-agentauth.local/profiles/vp-token/zkaa-ligero-v1
+local spec: web/profiles/vp-token/zkaa-ligero-v1.md
+local HTTP: http://localhost:8003/profiles/vp-token/zkaa-ligero-v1
+format: zkaa+ligero
+container: base64url/base64 encoded ZIP in vp_token.presentation_zip_b64
+required files:
+  - proof.bin
+  - public_delegation.json
+  - delegation_revocation_status.json
+optional disclosed-claim files:
+  - disclosed_claims_count.txt
+  - disclosed_alias_<i>.txt
+  - disclosed_namespace_<i>.txt
+  - disclosed_id_<i>.txt
+  - disclosed_cbor_value_<i>.bin
+binding:
+  - proof is verified against the original reader_request.cbor
+  - nonce/state are recovered from the OID4VP request stored by TripGo
+  - presentation_definition.input_descriptors[0].id maps to $.vp_token
+replay protection:
+  - each OID4VP request metadata starts with consumed=false
+  - /oid4vp/response marks the matching state/request_id as consumed after verification
+  - repeating the same state/request_id returns HTTP 409 replay_detected
+```
+
+`/oid4vp/response` 接收示例：
+
+```json
+{
+  "state": "request-state",
+  "vp_token": {
+    "format": "zkaa+ligero",
+    "profile": "https://zk-agentauth.local/profiles/vp-token/zkaa-ligero-v1",
+    "presentation_zip_b64": "...",
+    "claims": ["age_over_18"],
+    "order_request": {
+      "hotel_id": 1,
+      "checkin": "2026-05-29",
+      "checkout": "2026-05-31",
+      "agent_id": "tripgo-agent"
+    }
+  },
+  "presentation_submission": {
+    "id": "ps-demo",
+    "definition_id": "tripgo-zkaa-agentauth",
+    "descriptor_map": [
+      {
+        "id": "zkaa-ligero-presentation",
+        "format": "zkaa+ligero",
+        "path": "$.vp_token",
+        "path_nested": {
+          "format": "application/zip;base64",
+          "path": "$.vp_token.presentation_zip_b64",
+          "proof_files": {
+            "proof": "proof.bin",
+            "public_delegation": "public_delegation.json",
+            "revocation_status": "delegation_revocation_status.json"
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+服务端会按 `state` 找回原 reader request，解包 presentation 后继续调用同一个 verifier。
+
+TripGo verifier metadata:
+
+```bash
+curl --noproxy '*' http://localhost:8003/.well-known/oid4vp-verifier
+curl --noproxy '*' http://localhost:8003/oid4vp/jwks.json
+curl --noproxy '*' http://localhost:8003/profiles/vp-token/zkaa-ligero-v1
+```
+
+`request_object_jwt` 的 payload 是 `/oid4vp/request` 中的 request object 加上 `iss/aud/iat/exp`，签名 key 由 `/oid4vp/jwks.json` 发布。
+
+## 本地 HTTPS
+
+默认仍用 HTTP，方便浏览器和 curl 调试。要用本地自签 HTTPS：
+
+```bash
+USE_HTTPS=1 OPEN_BROWSER=0 ./start.sh
+```
+
+这会让 Wallet 和 TripGo 使用 Werkzeug `adhoc` 自签证书，并自动设置：
+
+```text
+OIDC_ISSUER=https://localhost:8002
+TRIPGO_ISSUER=https://localhost:8003
+TRIPGO_BASE=https://localhost:8003
+ZKAA_TLS_VERIFY=0
+```
+
+浏览器访问时会看到自签证书警告，curl 需加 `-k`。如果你用 Nginx/Caddy/Traefik 做反向代理，可显式设置 `OIDC_ISSUER`、`TRIPGO_ISSUER`、`TRIPGO_BASE` 指向代理后的 HTTPS origin。
 
 ## 目录布局
 
@@ -167,7 +376,8 @@ web/
 ## 安全 / 演示局限
 
 - `sk_I` 与 `sk_a` 共置于 :8002：演示简化。生产环境 Issuer 应是独立可信第三方。
-- HTTP 明文，未做 TLS。`X-Request-Id` 头无签名保护——:8002↔:8003 之间若有中间人可重放。生产需 mTLS + nonce 绑定。
+- 本地可用 `USE_HTTPS=1` 启动自签 HTTPS；生产仍应使用正式 CA 证书、反向代理或 mTLS。
+- OID4VP request object 已做 RS256 JWS 签名并暴露 TripGo verifier metadata/JWKS；Wallet 端当前仍是演示级消费，尚未实现完整信任锚配置和 request object 强校验。
 - 委托私钥下发：Alice 把 `agent_sk` 通过 ZK 证明绑定，本演示中 `agent_sk` 文件留在 task 目录方便观察；现实场景应由 Agent 远端生成、私钥永不离机。
 - feed 历史 in-memory，重启清零。生产应换 Redis/SSE proxy。
 - 撤销服务（链上 Merkle 树）当前为本地 JSON 文件 + 设备签名校验，未真正部署到链。

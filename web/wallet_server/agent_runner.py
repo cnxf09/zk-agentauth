@@ -4,6 +4,7 @@ A Task progresses through phases: delegating → fetching_request → proving �
 posting → done (or failed). Every transition emits an SSE event.
 """
 from __future__ import annotations
+import base64
 import io
 import json
 import os
@@ -30,10 +31,53 @@ _HTTP.trust_env = False
 # a verifier round-trip (~5–30s) on the TripGo side. 5 minutes covers
 # slow CI / cold-cache runs without hanging forever on real failures.
 _HTTP_TIMEOUT = 300
+_HTTP_VERIFY = os.environ.get("ZKAA_TLS_VERIFY", "1") != "0"
 
 
 _TASKS: dict[str, "Task"] = {}
 _TASKS_LOCK = threading.Lock()
+
+
+def _safe_extract_zip(zip_bytes: bytes, dest: Path):
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+        for info in z.infolist():
+            target = (dest / info.filename).resolve()
+            if not str(target).startswith(str(dest.resolve())):
+                raise ValueError(f"unsafe zip member: {info.filename}")
+        z.extractall(dest)
+
+
+def _claims_from_oid4vp_request(request_object: dict, fallback: list[str]) -> list[str]:
+    parsed: list[str] = []
+    claims = request_object.get("claims")
+
+    if isinstance(claims, list):
+        for claim in claims:
+            if isinstance(claim, dict):
+                alias = claim.get("alias") or claim.get("id") or claim.get("name")
+                if alias:
+                    parsed.append(str(alias))
+            elif isinstance(claim, str):
+                parsed.append(claim)
+
+    if not parsed:
+        descriptors = (
+            (request_object.get("presentation_definition") or {})
+            .get("input_descriptors")
+            or []
+        )
+        for descriptor in descriptors:
+            fields = ((descriptor.get("constraints") or {}).get("fields") or [])
+            for field in fields:
+                field_id = field.get("id")
+                if isinstance(field_id, str) and field_id.startswith("claim-"):
+                    parsed.append(field_id.removeprefix("claim-"))
+
+    deduped: list[str] = []
+    for claim in parsed or fallback:
+        if claim not in deduped:
+            deduped.append(claim)
+    return deduped
 
 
 class Task:
@@ -142,22 +186,41 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
                   agent_pkx=agent_pkx[:34] + "...",
                   delegation_msg=(delegation_dir / "delegation_msg.txt").read_text().strip()[:42] + "...")
 
-        # ── 2. Fetch reader request from TripGo ─────────────────
+        # ── 2. Fetch OID4VP request from TripGo ─────────────────
         # Predicates must round-trip to the verifier so the reader request
         # encodes the same `--predicate` flags the prover used; otherwise the
         # zk circuit's predicate binding would mismatch.
-        task.emit("fetching_request", message="向 TripGo 申请挑战 (reader request)")
-        r = _HTTP.post(f"{tripgo_base}/api/agent/request",
-                       json={"claims": p["claims"], "predicates": predicates},
-                       timeout=_HTTP_TIMEOUT)
+        task.emit("fetching_request", message="向 TripGo 申请 OID4VP 展示请求")
+        r = _HTTP.post(f"{tripgo_base}/oid4vp/request",
+                       json={
+                           "claims": p["claims"],
+                           "predicates": predicates,
+                           "state": task.id,
+                           "authorization_details": p.get("authorization_details") or [],
+                       },
+                       timeout=_HTTP_TIMEOUT,
+                       verify=_HTTP_VERIFY)
         r.raise_for_status()
-        request_id = r.headers.get("X-Request-Id", "")
+        oid4vp = r.json()
+        request_id = oid4vp.get("request_id", "")
+        request_object = oid4vp.get("request", {})
+        state = request_object.get("state") or oid4vp.get("state") or task.id
+        nonce = request_object.get("nonce")
+        requested_claims = _claims_from_oid4vp_request(request_object, p["claims"])
+        reader_zip_b64 = oid4vp.get("reader_request_zip_b64", "")
+        if not request_id or not reader_zip_b64:
+            raise RuntimeError("TripGo OID4VP request missing request_id or reader_request_zip_b64")
+        if not nonce:
+            raise RuntimeError("TripGo OID4VP request missing nonce")
         request_dir.mkdir(exist_ok=True)
-        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-            z.extractall(request_dir)
+        _safe_extract_zip(base64.b64decode(reader_zip_b64, validate=True), request_dir)
         task.emit("got_request",
                   files=sorted(os.listdir(request_dir)),
-                  request_id=request_id)
+                  request_id=request_id,
+                  state=state,
+                  nonce=nonce,
+                  claims=requested_claims,
+                  response_uri=request_object.get("response_uri"))
 
         # ── 3. ZK Prove ─────────────────────────────────────────
         task.emit("proving", message="生成 Ligero v2 ZK 证明 (~5s)")
@@ -186,28 +249,59 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
                   presentation_files=sorted(os.listdir(presentation_dir)),
                   public_delegation=public_delegation)
 
-        # ── 4. Post to TripGo ───────────────────────────────────
-        task.emit("posting", message="向 TripGo 投递 ZK presentation + public delegation")
+        # ── 4. Direct-post OID4VP response to TripGo ────────────
+        task.emit("posting", message="向 TripGo direct_post OID4VP vp_token")
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as z:
             for f in sorted(presentation_dir.iterdir()):
                 if f.is_file():
                     z.write(f, f.name)
-        zip_buf.seek(0)
+        presentation_zip_b64 = base64.b64encode(zip_buf.getvalue()).decode("ascii")
         order_req = {
             "hotel_id": p["hotel_id"],
             "checkin": p["checkin"],
             "checkout": p["checkout"],
-            "claims": p["claims"],
+            "claims": requested_claims,
             "predicates": predicates,
             "agent_id": p["agent_id"],
+            "channel": "oid4vp",
             "task_id": task.id,
             "request_id": request_id,
+            "authorization_details": p.get("authorization_details") or [],
         }
-        files = {"presentation": ("presentation.zip", zip_buf, "application/zip")}
-        data = {"order_request": json.dumps(order_req)}
-        r = _HTTP.post(f"{tripgo_base}/api/agent/order",
-                       files=files, data=data, timeout=_HTTP_TIMEOUT)
+        oid4vp_response = {
+            "state": state,
+            "vp_token": {
+                "format": "zkaa+ligero",
+                "profile": "https://zk-agentauth.local/profiles/vp-token/zkaa-ligero-v1",
+                "presentation_zip_b64": presentation_zip_b64,
+                "claims": requested_claims,
+            },
+            "presentation_submission": {
+                "id": f"ps-{task.id}",
+                "definition_id": "tripgo-zkaa-agentauth",
+                "descriptor_map": [
+                    {
+                        "id": "zkaa-ligero-presentation",
+                        "format": "zkaa+ligero",
+                        "path": "$.vp_token",
+                        "path_nested": {
+                            "format": "application/zip;base64",
+                            "path": "$.vp_token.presentation_zip_b64",
+                            "proof_files": {
+                                "proof": "proof.bin",
+                                "public_delegation": "public_delegation.json",
+                                "revocation_status": "delegation_revocation_status.json"
+                            }
+                        }
+                    }
+                ],
+            },
+            "order_request": order_req,
+        }
+        r = _HTTP.post(f"{tripgo_base}/oid4vp/response",
+                       json=oid4vp_response, timeout=_HTTP_TIMEOUT,
+                       verify=_HTTP_VERIFY)
         if r.status_code != 200:
             task.emit("failed", error=f"TripGo {r.status_code}: {r.text[:200]}")
             return
