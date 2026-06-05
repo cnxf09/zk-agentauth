@@ -36,6 +36,41 @@ _HTTP_VERIFY = os.environ.get("ZKAA_TLS_VERIFY", "1") != "0"
 
 _TASKS: dict[str, "Task"] = {}
 _TASKS_LOCK = threading.Lock()
+_LOG_LOCK = threading.Lock()
+
+
+def _log_path(tasks_dir: Path) -> Path:
+    # Persisted, append-only log of every ZK presentation. Survives restart.
+    return tasks_dir.parent / "agent_log.jsonl"
+
+
+def _append_log(tasks_dir: Path, entry: dict):
+    try:
+        with _LOG_LOCK:
+            with _log_path(tasks_dir).open("a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def read_log(tasks_dir: Path, limit: int = 100) -> list[dict]:
+    path = _log_path(tasks_dir)
+    if not path.exists():
+        return []
+    out = []
+    try:
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        out.append(json.loads(line))
+                    except Exception:
+                        pass
+    except Exception:
+        return []
+    out.reverse()  # newest first
+    return out[:limit]
 
 
 def _safe_extract_zip(zip_bytes: bytes, dest: Path):
@@ -309,6 +344,32 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
         task.result = result
 
         # ── 5. Done ─────────────────────────────────────────────
+        order = result.get("order") or {}
+        checks = result.get("checks") or {}
+        _append_log(tasks_dir, {
+            "ts": time.time(),
+            "task_id": task.id,
+            "status": "done",
+            "accepted": bool(result.get("accepted")),
+            "overall": checks.get("overall"),
+            "checks": checks,
+            "agent_id": p.get("agent_id"),
+            "claims": order.get("claims_proven") or requested_claims,
+            "hotel_id": p.get("hotel_id"),
+            "hotel_name": order.get("hotel_name"),
+            "proof_size": order.get("proof_size") or proof_size,
+            "order_id": result.get("order_id") or order.get("order_id"),
+        })
         task.emit("done", **result)
     except Exception as e:
+        _append_log(tasks_dir, {
+            "ts": time.time(),
+            "task_id": task.id,
+            "status": "failed",
+            "accepted": False,
+            "agent_id": p.get("agent_id"),
+            "claims": p.get("claims"),
+            "hotel_id": p.get("hotel_id"),
+            "error": str(e),
+        })
         task.emit("failed", error=str(e))

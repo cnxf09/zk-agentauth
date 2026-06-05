@@ -25,11 +25,19 @@
 /web/data/tripgo/tasks/
 /web/data/tripgo/oid4vp_verifier_signing_key.pem
 
+# Runtime config / state (regenerated; llm_config.json holds the API key — never commit)
+/web/data/wallet/llm_config.json
+/web/data/wallet/profiles.json
+/web/data/wallet/agent_log.jsonl
+/web/data/wallet/revocation_state.json
+
+# Local-only Claude Code guidance (not committed)
+/CLAUDE.md
+
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
 *.swp
 *~
-run_cli_tests.sh
 run_cli_tests.sh

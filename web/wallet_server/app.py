@@ -40,6 +40,8 @@ OAUTH_GRANTS_DIR = DATA / "wallet" / "oauth_grants"
 OAUTH_TOKENS_DIR = DATA / "wallet" / "oauth_tokens"
 OIDC_SIGNING_KEY_PATH = DATA / "wallet" / "oidc_signing_key.pem"
 REVOCATION_STATE_PATH = DATA / "wallet" / "revocation_state.json"
+LLM_CONFIG_PATH = DATA / "wallet" / "llm_config.json"
+PROFILES_PATH = DATA / "wallet" / "profiles.json"
 ISSUER_PUBLIC_DIR = DATA / "shared" / "issuer_public"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SCHEMAS_DIR = ROOT / "schemas"
@@ -51,6 +53,14 @@ DEFAULT_SCHEME = "https" if USE_HTTPS else "http"
 TRIPGO_BASE = os.environ.get("TRIPGO_BASE", f"{DEFAULT_SCHEME}://localhost:8003")
 OIDC_ISSUER = os.environ.get("OIDC_ISSUER", f"{DEFAULT_SCHEME}://localhost:{PORT}")
 OIDC_KEY_ID = os.environ.get("OIDC_KEY_ID", "wallet-demo-rs256-1")
+# LLM proxy config. Env vars are defaults; the "模型" panel can override them at
+# runtime by writing data/wallet/llm_config.json (file wins over env).
+LLM_ENV_DEFAULTS = {
+    "provider": os.environ.get("LLM_PROVIDER", "openai"),
+    "api_base": os.environ.get("LLM_API_BASE", "https://api.openai.com/v1"),
+    "model": os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+    "api_key": os.environ.get("LLM_API_KEY", ""),
+}
 AGENT_DELEGATION_AUTHZ_TYPE = "https://zk-agentauth.local/authorization/agent-delegation"
 AGENT_DELEGATION_AUTHZ_TYPE_ALIASES = {
     AGENT_DELEGATION_AUTHZ_TYPE,
@@ -811,11 +821,19 @@ def wallet_revoke_clear():
     return jsonify({"ok": True})
 
 
+def _fetch_catalog() -> list:
+    """Return TripGo's hotel catalog as a list (used by /api/catalog and the
+    LLM system prompt). trust_env=False bypasses a local Clash/V2Ray proxy."""
+    s = requests.Session(); s.trust_env = False
+    r = s.get(f"{TRIPGO_BASE}/api/catalog", timeout=10, verify=_outbound_tls_verify())
+    r.raise_for_status()
+    data = r.json()
+    return data if isinstance(data, list) else data.get("hotels", [])
+
+
 @app.route("/api/catalog")
 def catalog_proxy():
     try:
-        # trust_env=False bypasses HTTP_PROXY/HTTPS_PROXY/ALL_PROXY env vars
-        # (e.g., a local Clash proxy on 7890) for localhost cross-service calls.
         s = requests.Session(); s.trust_env = False
         r = s.get(f"{TRIPGO_BASE}/api/catalog", timeout=10,
                   verify=_outbound_tls_verify())
@@ -824,17 +842,338 @@ def catalog_proxy():
         return jsonify({"error": f"TripGo unreachable: {e}"}), 502
 
 
-@app.route("/api/agent/dispatch", methods=["POST"])
-def agent_dispatch():
-    body = request.get_json(force=True, silent=True) or {}
-    if not _holder_present():
-        return jsonify({"error": "no mDoc on wallet — call /api/wallet/reissue first"}), 400
+# ── LLM config + chat proxy ─────────────────────────────────────────────────
+
+def _load_llm_config() -> dict:
+    """Effective LLM config: env defaults overlaid by data/wallet/llm_config.json."""
+    cfg = dict(LLM_ENV_DEFAULTS)
+    if LLM_CONFIG_PATH.exists():
+        try:
+            saved = json.loads(LLM_CONFIG_PATH.read_text())
+            for k in ("provider", "api_base", "model", "api_key"):
+                if saved.get(k):
+                    cfg[k] = saved[k]
+        except Exception:
+            pass
+    return cfg
+
+
+def _save_llm_config(patch: dict):
+    cfg = {}
+    if LLM_CONFIG_PATH.exists():
+        try:
+            cfg = json.loads(LLM_CONFIG_PATH.read_text())
+        except Exception:
+            cfg = {}
+    for k in ("provider", "api_base", "model"):
+        if patch.get(k) is not None:
+            cfg[k] = patch[k]
+    # Only overwrite the key when a new non-empty value is supplied.
+    if patch.get("api_key"):
+        cfg["api_key"] = patch["api_key"]
+    LLM_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LLM_CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2))
+
+
+@app.route("/api/llm/config", methods=["GET", "POST"])
+def llm_config():
+    if request.method == "POST":
+        body = request.get_json(force=True, silent=True) or {}
+        _save_llm_config(body)
+    cfg = _load_llm_config()
+    # Never echo the key back; expose only whether one is configured.
+    return jsonify({
+        "provider": cfg["provider"],
+        "api_base": cfg["api_base"],
+        "model": cfg["model"],
+        "has_key": bool(cfg["api_key"]),
+    })
+
+
+# ── Agent profiles (档案): each profile is a named Agent with its own set of
+# claims it is allowed to disclose. allowed_claims is enforced end-to-end: it
+# becomes the delegation policy passed to alice_delegate, so the ZK circuit's
+# "Policy claims" check rejects any disclosure outside the list. ────────────
+
+# Seeded on first run so the demo is immediately usable and illustrates the
+# core property (different agents → different permissions).
+_DEFAULT_PROFILES = [
+    {"id": "agent-travel", "name": "出行助手", "agent_id": "travel-agent",
+     "allowed_claims": ["age_over_18"], "predicates": [],
+     "expires": "2027-01-01T00:00:00Z",
+     "desc": "只能证明你已年满 18 岁,用于预订 18+ 酒店。"},
+    {"id": "agent-kyc", "name": "实名助手", "agent_id": "kyc-agent",
+     "allowed_claims": ["family_name"], "predicates": [],
+     "expires": "2027-01-01T00:00:00Z",
+     "desc": "只能证明你的姓氏,无法得知你的年龄。"},
+]
+
+
+def _load_profiles() -> list:
+    if not PROFILES_PATH.exists():
+        _save_profiles(_DEFAULT_PROFILES)
+        return list(_DEFAULT_PROFILES)
     try:
-        authorization_details, agent_policy = _agent_policy_from_authorization_details(
-            body.get("authorization_details"), body.get("client_id", "")
-        )
-    except (json.JSONDecodeError, ValueError) as e:
-        return jsonify({"error": f"invalid authorization_details: {e}"}), 400
+        data = json.loads(PROFILES_PATH.read_text())
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _save_profiles(profiles: list):
+    PROFILES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PROFILES_PATH.write_text(json.dumps(profiles, ensure_ascii=False, indent=2))
+
+
+def _profile_by_id(pid: str) -> dict | None:
+    return next((p for p in _load_profiles() if p.get("id") == pid), None)
+
+
+@app.route("/api/profiles", methods=["GET", "POST"])
+def profiles():
+    if request.method == "POST":
+        body = request.get_json(force=True, silent=True) or {}
+        name = (body.get("name") or "").strip()
+        if not name:
+            return jsonify({"error": "name required"}), 400
+        # Validate against the holder's claim aliases (the short names that
+        # alice_delegate --claim expects), not the long supported_claims labels.
+        holder_claims = _read_holder_claims()
+        allowed = [c for c in (body.get("allowed_claims") or []) if c in holder_claims]
+        items = _load_profiles()
+        pid = body.get("id")
+        prof = {
+            "id": pid or ("agent-" + secrets.token_hex(4)),
+            "name": name,
+            "agent_id": (body.get("agent_id") or "").strip() or
+                        ("agent-" + secrets.token_hex(3)),
+            "allowed_claims": allowed,
+            "predicates": body.get("predicates") or [],
+            "expires": body.get("expires") or "2027-01-01T00:00:00Z",
+            "desc": (body.get("desc") or "").strip(),
+        }
+        if pid and any(p["id"] == pid for p in items):
+            items = [prof if p["id"] == pid else p for p in items]
+        else:
+            items.append(prof)
+        _save_profiles(items)
+        return jsonify(prof)
+    return jsonify(_load_profiles())
+
+
+@app.route("/api/profiles/<pid>", methods=["DELETE"])
+def delete_profile(pid):
+    items = [p for p in _load_profiles() if p.get("id") != pid]
+    _save_profiles(items)
+    return jsonify({"ok": True})
+
+
+# Tool the model can call to trigger a real ZK delegated booking.
+_BOOK_HOTEL_TOOL = {
+    "name": "book_hotel",
+    "description": (
+        "Book a hotel on behalf of the user via the anonymous ZK delegation flow. "
+        "Use this whenever the user asks to book/reserve a hotel. The booking runs "
+        "a zero-knowledge proof so the merchant learns only the disclosed claims, "
+        "never the user's real identity."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "hotel_query": {
+                "type": "string",
+                "description": "Hotel name or keyword the user mentioned, e.g. '外滩璞丽'.",
+            },
+            "claims": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Claims to disclose/prove, e.g. ['age_over_18']. Defaults to age_over_18.",
+            },
+        },
+        "required": ["hotel_query"],
+    },
+}
+
+
+def _match_hotel(query: str, catalog: list) -> dict | None:
+    if not query:
+        return None
+    q = str(query).strip().lower()
+    for h in catalog:
+        name = str(h.get("name", "")).lower()
+        if q in name or name in q:
+            return h
+    # Looser fallback: any shared non-trivial substring.
+    for h in catalog:
+        name = str(h.get("name", "")).lower()
+        if any(tok and tok in name for tok in q.split()):
+            return h
+    return None
+
+
+def _llm_system_prompt(catalog: list, holder_claims: list[str], profile: dict | None) -> str:
+    lines = [f"- id={h.get('id')} {h.get('name')} ¥{h.get('price')}"
+             + (" [18+]" if h.get("age") else "") for h in catalog]
+    allowed = (profile or {}).get("allowed_claims") or []
+    agent_name = (profile or {}).get("name") or "隐私 Agent"
+    return (
+        f"你是名为「{agent_name}」的 ZK-AgentAuth 隐私 Agent。你代表用户与商家交互,"
+        "但通过零知识证明,商家只能得知被授权披露的属性,无法回溯用户真实身份。\n"
+        f"用户钱包持有的属性: {', '.join(holder_claims) or '(无)'}。\n"
+        f"⚠️ 本 Agent 仅被授权披露这些属性: {', '.join(allowed) or '(无)'}。"
+        "你绝不能尝试披露授权之外的属性;若用户要求披露未授权属性,礼貌拒绝并说明本 Agent 的权限范围。\n"
+        "可预订的酒店目录:\n" + "\n".join(lines) + "\n"
+        "当用户想订酒店时,调用 book_hotel 工具(传 hotel_query 和需要披露的 claims,claims 必须是上面授权列表的子集)。"
+        "若酒店标注 [18+] 但本 Agent 未被授权 age_over_18,则无法预订,需如实告知用户。其他问题正常用中文回答。"
+    )
+
+
+def _call_openai(cfg, messages, tools):
+    s = requests.Session(); s.trust_env = False
+    body = {"model": cfg["model"], "messages": messages}
+    if tools:
+        body["tools"] = [{"type": "function", "function": t} for t in tools]
+    r = s.post(f"{cfg['api_base'].rstrip('/')}/chat/completions",
+               headers={"Authorization": f"Bearer {cfg['api_key']}",
+                        "Content-Type": "application/json"},
+               json=body, timeout=120, verify=_outbound_tls_verify())
+    r.raise_for_status()
+    choice = r.json()["choices"][0]["message"]
+    text = choice.get("content") or ""
+    tool_calls = []
+    for tc in (choice.get("tool_calls") or []):
+        fn = tc.get("function", {})
+        try:
+            args = json.loads(fn.get("arguments") or "{}")
+        except Exception:
+            args = {}
+        tool_calls.append({"name": fn.get("name"), "args": args})
+    return text, tool_calls
+
+
+def _call_anthropic(cfg, messages, tools):
+    s = requests.Session(); s.trust_env = False
+    system = ""
+    conv = []
+    for m in messages:
+        if m["role"] == "system":
+            system += m["content"] + "\n"
+        else:
+            conv.append({"role": m["role"], "content": m["content"]})
+    body = {"model": cfg["model"], "max_tokens": 1024, "messages": conv}
+    if system:
+        body["system"] = system
+    if tools:
+        body["tools"] = [{"name": t["name"], "description": t["description"],
+                          "input_schema": t["parameters"]} for t in tools]
+    r = s.post(f"{cfg['api_base'].rstrip('/')}/messages",
+               headers={"x-api-key": cfg["api_key"],
+                        "anthropic-version": "2023-06-01",
+                        "Content-Type": "application/json"},
+               json=body, timeout=120, verify=_outbound_tls_verify())
+    r.raise_for_status()
+    text, tool_calls = "", []
+    for block in r.json().get("content", []):
+        if block.get("type") == "text":
+            text += block.get("text", "")
+        elif block.get("type") == "tool_use":
+            tool_calls.append({"name": block.get("name"), "args": block.get("input") or {}})
+    return text, tool_calls
+
+
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    cfg = _load_llm_config()
+    if not cfg["api_key"]:
+        return jsonify({"error": "LLM 未配置,请在「模型」面板填写 API Key"}), 400
+    body = request.get_json(force=True, silent=True) or {}
+    user_messages = body.get("messages") or []
+    if body.get("model"):
+        cfg = {**cfg, "model": body["model"]}
+
+    # The conversation is bound to an Agent profile (档案). Its allowed_claims
+    # are enforced below, not merely suggested to the model.
+    profile = _profile_by_id(body.get("agent") or "") if body.get("agent") else None
+    allowed = (profile or {}).get("allowed_claims") or []
+
+    try:
+        catalog = _fetch_catalog()
+    except requests.RequestException:
+        catalog = []
+    holder_claims = _read_holder_claims()
+    messages = [{"role": "system", "content": _llm_system_prompt(catalog, holder_claims, profile)}]
+    messages += [{"role": m["role"], "content": m["content"]} for m in user_messages
+                 if m.get("role") in ("user", "assistant") and m.get("content")]
+
+    try:
+        if cfg["provider"] == "anthropic":
+            text, tool_calls = _call_anthropic(cfg, messages, [_BOOK_HOTEL_TOOL])
+        else:
+            text, tool_calls = _call_openai(cfg, messages, [_BOOK_HOTEL_TOOL])
+    except requests.RequestException as e:
+        return jsonify({"error": f"LLM 调用失败: {e}"}), 502
+
+    tool_invocation = None
+    for call in tool_calls:
+        if call["name"] != "book_hotel":
+            continue
+        hotel = _match_hotel(call["args"].get("hotel_query", ""), catalog)
+        if not hotel:
+            text = (text + "\n\n" if text else "") + \
+                f"抱歉,没找到「{call['args'].get('hotel_query','')}」对应的酒店。"
+            break
+        requested = call["args"].get("claims") or (allowed[:1] if allowed else ["age_over_18"])
+        # Hard enforcement: the Agent may only disclose claims in its policy.
+        if profile is not None:
+            forbidden = [c for c in requested if c not in allowed]
+            if forbidden:
+                text = (text + "\n\n" if text else "") + (
+                    f"⚠️ 本 Agent「{profile.get('name')}」无权证明 {', '.join(forbidden)},"
+                    f"它只被授权披露: {', '.join(allowed) or '(无)'}。已拒绝本次下单。")
+                break
+            claims = [c for c in requested if c in allowed]
+            if not claims:
+                text = (text + "\n\n" if text else "") + \
+                    f"⚠️ 本 Agent「{profile.get('name')}」没有可披露的授权属性,无法完成预订。"
+                break
+        else:
+            claims = requested
+        # ZK spec currently supports at most 2 disclosed claims per proof.
+        claims = claims[:2]
+        if not _holder_present():
+            return jsonify({"error": "no mDoc on wallet — call /api/wallet/reissue first"}), 400
+        dispatch_body = {"hotel_id": hotel["id"], "claims": claims}
+        if profile is not None:
+            dispatch_body["agent_id"] = profile.get("agent_id")
+            dispatch_body["expires"] = profile.get("expires")
+            if profile.get("predicates"):
+                dispatch_body["predicates"] = profile["predicates"]
+        try:
+            params = _build_dispatch_params(dispatch_body)
+        except (json.JSONDecodeError, ValueError) as e:
+            return jsonify({"error": str(e)}), 400
+        task = _dispatch_task(params)
+        tool_invocation = {"task_id": task.id, "hotel_name": hotel.get("name"),
+                           "hotel_id": hotel["id"], "claims": claims,
+                           "agent": (profile or {}).get("name")}
+        if not text:
+            text = (f"好的,正在以「{(profile or {}).get('name','隐私 Agent')}」身份通过零知识证明"
+                    f"为你预订「{hotel.get('name')}」,仅披露 {', '.join(claims)},商家不会得知你的真实身份。")
+        break
+
+    return jsonify({"reply": text, "tool_invocation": tool_invocation})
+
+
+def _build_dispatch_params(body: dict) -> dict:
+    """Assemble agent_runner.dispatch params from a request body.
+
+    Shared by /api/agent/dispatch (manual) and /api/chat (LLM tool call) so the
+    pending-revocation consume-on-use semantics and policy defaults stay in one
+    place. Raises ValueError on invalid authorization_details / missing hotel_id.
+    """
+    authorization_details, agent_policy = _agent_policy_from_authorization_details(
+        body.get("authorization_details"), body.get("client_id", "")
+    )
     # Pending revocation (set by the wallet UI's "撤销委托" button) takes
     # precedence over the dispatch body's revoked flag. Consume-on-use: read
     # the flag, clear it, then mark THIS dispatch as revoked so the verifier
@@ -862,14 +1201,30 @@ def agent_dispatch():
         "revoked": revoked_pending or bool(body.get("revoked")),
     }
     if not params["hotel_id"]:
-        return jsonify({"error": "hotel_id required"}), 400
-    task = agent_runner.dispatch(
+        raise ValueError("hotel_id required")
+    return params
+
+
+def _dispatch_task(params: dict):
+    return agent_runner.dispatch(
         params=params,
         holder_dir=HOLDER_DIR,
         issuer_public_dir=ISSUER_PUBLIC_DIR,
         tasks_dir=TASKS_DIR,
         tripgo_base=TRIPGO_BASE,
     )
+
+
+@app.route("/api/agent/dispatch", methods=["POST"])
+def agent_dispatch():
+    body = request.get_json(force=True, silent=True) or {}
+    if not _holder_present():
+        return jsonify({"error": "no mDoc on wallet — call /api/wallet/reissue first"}), 400
+    try:
+        params = _build_dispatch_params(body)
+    except (json.JSONDecodeError, ValueError) as e:
+        return jsonify({"error": str(e)}), 400
+    task = _dispatch_task(params)
     return jsonify({"task_id": task.id})
 
 
@@ -913,6 +1268,17 @@ def agent_task_stream(tid):
 @app.route("/api/agent/history")
 def agent_history():
     return jsonify(agent_runner.list_tasks(50))
+
+
+@app.route("/api/agent/log")
+def agent_log():
+    # Persisted, real ZK presentation log (survives restart). Enriched with the
+    # Agent's display name from profiles when available.
+    name_by_agent_id = {p.get("agent_id"): p.get("name") for p in _load_profiles()}
+    entries = agent_runner.read_log(TASKS_DIR, 100)
+    for e in entries:
+        e["agent_name"] = name_by_agent_id.get(e.get("agent_id")) or e.get("agent_id")
+    return jsonify(entries)
 
 
 def main():
