@@ -16,10 +16,11 @@ zk-agentauth/
 │   └── examples/
 │       ├── mdoc_anoncred/   ← mDoc 颁发/持有/出示原型（被 delegation_demo 复用）
 │       └── delegation_demo/ ← 本项目核心：issuer / alice / agent / verifier 四个 CLI
-└── web/                     ← 双服务 Web 演示
+└── web/                     ← 双服务 Web 演示 + MCP 服务
     ├── README.md            ← 子项目使用说明
     ├── Makefile · start.sh · requirements.txt
-    ├── wallet_server/       ← Flask :8002（Issuer + Alice + Agent + Client UI）
+    ├── mcp_server/          ← MCP 服务（stdio），供 Claude Desktop / Hermes 等复用
+    ├── wallet_server/       ← Flask :8002（Issuer + Alice + Agent + Client UI + /manage 管理台）
     ├── tripgo_server/       ← Flask :8003（验证方 / 商家 + Service UI）
     └── data/                ← 运行时数据（mDoc / 订单 / 任务工作目录）
 ```
@@ -59,7 +60,7 @@ cd web && make build
 ### 方式 A · Web 双服务演示（推荐，可视化）
 
 ```bash
-m
+cd web
 make deps          # python3 -m venv .venv && pip install -r requirements.txt
 make demo          # ./start.sh，自动打开浏览器
 ```
@@ -67,9 +68,17 @@ make demo          # ./start.sh，自动打开浏览器
 | 端口 | URL | 角色 |
 |------|-----|------|
 | 8002 | http://localhost:8002 | Alice 的钱包（Client UI） |
+| 8002 | http://localhost:8002/manage | 本地权限/凭证管理台 |
 | 8003 | http://localhost:8003 | TripGo 商户站（Service UI） |
 
 详细演示步骤、API 速查、篡改/撤销负向用例都在 [`web/README.md`](web/README.md)。
+
+### 方式 C · 接入其他 AI Agent（MCP 服务）
+
+把匿名委托能力作为 **MCP 服务(stdio)** 暴露,Claude Desktop / Hermes / openclaw 等加一段
+配置即可复用(宿主侧零代码)。先 `make demo` 起后端,再在宿主里配置 MCP server。配置片段、
+工具清单、本地管理台用法见 [`web/README.md`](web/README.md#接入其他-ai-agentmcp-服务)
+与 [`web/mcp_server/README.md`](web/mcp_server/README.md)。
 
 ### 方式 B · 命令行演示（直接调四个 CLI）
 

@@ -8,7 +8,7 @@ BUILD ?= ../build
 BUILD_TYPE ?= Release
 TARGETS = delegation_demo_issuer delegation_demo_alice delegation_demo_agent delegation_demo_verifier
 
-.PHONY: deps configure build demo clean check
+.PHONY: deps configure build demo clean check mcp mcp-dev
 
 deps:
 	@if [ ! -d .venv ]; then $(PYTHON) -m venv .venv; fi
@@ -28,6 +28,15 @@ check:
 demo: check
 	chmod +x start.sh
 	./start.sh
+
+# Run the MCP server (stdio). Usually the MCP host launches this; this target is
+# for local debugging. Requires the wallet running (make demo) in another shell.
+mcp:
+	./.venv/bin/python mcp_server/server.py
+
+# Open the MCP Inspector to interactively call the tools.
+mcp-dev:
+	./.venv/bin/python -m mcp dev mcp_server/server.py
 
 clean:
 	rm -rf data/wallet/holder data/wallet/delegation data/wallet/tasks/* data/shared/issuer_public data/tripgo/orders.json data/tripgo/tasks/*

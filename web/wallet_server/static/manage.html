@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZK-AgentAuth 管理台</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root { --accent:#5B6CFF; --accent-soft: color-mix(in oklab,#5B6CFF 12%, transparent); }
+  html,body { margin:0; padding:0; height:100%; background:#faf8f4;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro","PingFang SC","Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; color:#1d1c1a; }
+  body { overflow:hidden; }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(1100px 760px at 12% -5%, rgba(255,196,150,0.42), transparent 55%),
+      radial-gradient(900px 720px at 105% 8%, rgba(150,170,255,0.30), transparent 58%),
+      radial-gradient(820px 680px at 60% 110%, rgba(255,170,210,0.26), transparent 60%); }
+  #root { position:relative; z-index:1; width:100vw; height:100vh; display:flex; }
+  .card { transition:transform .16s ease, box-shadow .16s ease; }
+  .card:hover { transform:translateY(-2px); }
+  .btn { transition:transform .12s ease, filter .12s ease; }
+  .btn:hover { filter:brightness(1.04); }
+  .btn:active { transform:translateY(1px); }
+  .fade { animation:fadeUp .28s ease both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:none;} }
+  input,select,textarea { font-family:inherit; }
+  .inp:focus { outline:none; box-shadow:0 0 0 3px var(--accent-soft); border-color:var(--accent)!important; }
+  pre { white-space:pre-wrap; word-break:break-all; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const C = {
+  bg:'#faf8f4', card:'#ffffff', text:'#1d1c1a',
+  sub:'rgba(29,28,26,0.62)', faint:'rgba(29,28,26,0.40)',
+  border:'rgba(0,0,0,0.08)', borderSoft:'rgba(0,0,0,0.05)',
+  accent:'#5B6CFF', success:'#1e9c66', warn:'#cd8500', danger:'#d8483f',
+  chip:'rgba(0,0,0,0.04)',
+  accentSoft:'color-mix(in oklab,#5B6CFF 12%, transparent)',
+  accentGrad:'linear-gradient(135deg,#5B6CFF, color-mix(in oklab,#5B6CFF 62%, #8e6fe0))',
+  headerTint:'color-mix(in oklab,#5B6CFF 7%, white)',
+  shadow:'0 1px 2px rgba(40,30,20,0.06)',
+  shadowMd:'0 1px 3px rgba(40,30,20,0.06), 0 8px 24px rgba(40,30,20,0.10)',
+};
+const CLAIM_LABELS = { age_over_18:'已满 18 岁', family_name:'姓氏', birth_date:'出生日期', height:'身高' };
+const claimLabel = (c) => CLAIM_LABELS[c] || c;
+
+const ICONS = {
+  user:<React.Fragment><circle cx="12" cy="8" r="3.6"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></React.Fragment>,
+  card:<React.Fragment><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/><circle cx="16.5" cy="14" r="1.3"/></React.Fragment>,
+  shield:<path d="M12 21.5s7.5-3.8 7.5-9.5V5.5L12 2.7 4.5 5.5V12c0 5.7 7.5 9.5 7.5 9.5z"/>,
+  list:<path d="M4 7h16M4 12h16M4 17h10"/>,
+  plug:<React.Fragment><path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0z"/><path d="M12 16v6"/></React.Fragment>,
+};
+function Icon({ name, size=19 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{display:'block'}}>{ICONS[name]||ICONS.list}</svg>;
+}
+function Btn({ children, kind='default', onClick, disabled, danger, style={} }) {
+  const v = {
+    primary:{ background:C.accentGrad, color:'#fff', boxShadow:'0 2px 8px '+C.accentSoft },
+    default:{ background:C.card, color:C.text, boxShadow:'inset 0 0 0 0.5px '+C.border },
+    ghost:{ background:'transparent', color:C.sub },
+    danger:{ background:'linear-gradient(135deg,'+C.danger+', color-mix(in oklab,'+C.danger+' 70%, #ff7a5c))', color:'#fff' },
+  }[danger?'danger':kind];
+  return <button className={disabled?undefined:'btn'} disabled={disabled} onClick={disabled?undefined:onClick}
+    style={{ appearance:'none', border:0, font:'inherit', fontWeight:600, fontSize:15, padding:'8px 14px',
+      borderRadius:10, cursor:disabled?'not-allowed':'pointer', opacity:disabled?0.45:1, ...v, ...style }}>{children}</button>;
+}
+function Pill({ children, tone='neutral' }) {
+  const t = {
+    neutral:{ bg:C.chip, fg:C.sub },
+    accent:{ bg:'color-mix(in oklab,'+C.accent+' 12%, transparent)', fg:C.accent },
+    success:{ bg:'color-mix(in oklab,'+C.success+' 14%, transparent)', fg:C.success },
+    warn:{ bg:'color-mix(in oklab,'+C.warn+' 16%, transparent)', fg:C.warn },
+    danger:{ bg:'color-mix(in oklab,'+C.danger+' 14%, transparent)', fg:C.danger },
+  }[tone];
+  return <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'2px 9px',
+    borderRadius:999, background:t.bg, color:t.fg, fontSize:13, fontWeight:500 }}>{children}</span>;
+}
+function Section({ title, hint, children }) {
+  return <div style={{ background:C.card, border:'0.5px solid '+C.border, borderRadius:16,
+    padding:18, boxShadow:C.shadowMd }}>
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:12, marginBottom:12 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+        <span style={{ width:4, height:16, borderRadius:3, background:C.accentGrad }}/>
+        <div style={{ fontSize:18, fontWeight:700 }}>{title}</div>
+      </div>
+      {hint && <div style={{ fontSize:13, color:C.faint, textAlign:'right' }}>{hint}</div>}
+    </div>
+    {children}
+  </div>;
+}
+function Header({ title, sub, actions }) {
+  return <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:16,
+    padding:'18px 28px 14px', borderBottom:'0.5px solid '+C.borderSoft,
+    background:'linear-gradient(180deg,'+C.headerTint+', transparent)' }}>
+    <div>
+      <div style={{ fontSize:30, fontWeight:800, letterSpacing:'-0.02em' }}>{title}</div>
+      {sub && <div style={{ fontSize:15, color:C.sub, marginTop:3 }}>{sub}</div>}
+    </div>
+    <div style={{ display:'flex', gap:8 }}>{actions}</div>
+  </div>;
+}
+const api = {
+  get:(p)=>fetch(p).then(r=>r.json()),
+  post:(p,b)=>fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}).then(r=>r.json()),
+  del:(p)=>fetch(p,{method:'DELETE'}).then(r=>r.json()),
+};
+const fmtTs = (ts)=>{ try { return new Date(ts*1000).toLocaleString('zh-CN',{hour12:false}); } catch(e){ return '—'; } };
+const fmtKB = (n)=> n ? (n/1024).toFixed(0)+' KB' : '—';
+
+// ── 档案(权限核心)──────────────────────────────────────────────
+function ProfileEditor({ initial, supported, onClose, onSaved }) {
+  const [name,setName]=useState(initial?initial.name:'');
+  const [desc,setDesc]=useState(initial?(initial.desc||''):'');
+  const [claims,setClaims]=useState(new Set(initial?initial.allowed_claims:[]));
+  const [saving,setSaving]=useState(false);
+  const toggle=(c)=>{ const n=new Set(claims); n.has(c)?n.delete(c):n.add(c); setClaims(n); };
+  const save=async()=>{ if(!name.trim())return; setSaving(true);
+    await api.post('/api/profiles',{ id:initial&&initial.id, name:name.trim(), desc:desc.trim(),
+      agent_id:initial&&initial.agent_id, allowed_claims:[...claims] });
+    setSaving(false); onSaved(); };
+  const inp={ width:'100%', boxSizing:'border-box', padding:'9px 12px', borderRadius:9,
+    border:'0.5px solid '+C.border, background:C.card, color:C.text, fontSize:15 };
+  return <div style={{ position:'absolute', inset:0, zIndex:30, background:'rgba(0,0,0,0.35)',
+    display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <div className="fade" style={{ width:460, maxHeight:'86%', overflow:'auto', background:C.bg, borderRadius:14,
+      padding:24, boxShadow:'0 24px 60px rgba(0,0,0,0.4)' }}>
+      <div style={{ fontSize:22, fontWeight:700, marginBottom:16 }}>{initial?'编辑 Agent':'新建 Agent'}</div>
+      <div style={{ fontSize:14, color:C.sub, marginBottom:6 }}>名称</div>
+      <input className="inp" value={name} onChange={e=>setName(e.target.value)} placeholder="例如:出行助手" style={{...inp, marginBottom:16}}/>
+      <div style={{ fontSize:14, color:C.sub, marginBottom:6 }}>说明(可选)</div>
+      <input className="inp" value={desc} onChange={e=>setDesc(e.target.value)} placeholder="这个 Agent 的用途" style={{...inp, marginBottom:16}}/>
+      <div style={{ fontSize:14, color:C.sub, marginBottom:8 }}>授权可披露的属性(ZK 电路强制,Agent 只能证明被勾选的属性)</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+        {supported.map(c=>{ const on=claims.has(c); return <button key={c} onClick={()=>toggle(c)} style={{
+          appearance:'none', font:'inherit', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:10,
+          padding:'10px 12px', borderRadius:9, border:'0.5px solid '+(on?C.accent:C.border),
+          background:on?'color-mix(in oklab,#5B6CFF 10%, white)':C.card, color:C.text }}>
+          <span style={{ width:20, height:20, borderRadius:6, flexShrink:0, color:'#fff', fontSize:12,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            background:on?C.accent:'transparent', border:'1.5px solid '+(on?C.accent:C.border) }}>{on?'✓':''}</span>
+          <span style={{ flex:1, fontSize:15 }}>{claimLabel(c)}</span>
+          <span style={{ fontSize:12, color:C.faint, fontFamily:'ui-monospace,Menlo,monospace' }}>{c}</span>
+        </button>; })}
+      </div>
+      <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:18 }}>
+        <Btn kind="ghost" onClick={onClose}>取消</Btn>
+        <Btn kind="primary" onClick={save} disabled={saving||!name.trim()}>保存</Btn>
+      </div>
+    </div>
+  </div>;
+}
+function ProfilesView() {
+  const [profiles,setProfiles]=useState([]);
+  const [supported,setSupported]=useState([]);
+  const [editing,setEditing]=useState(null);
+  const reload=()=>api.get('/api/profiles').then(setProfiles);
+  useEffect(()=>{ reload(); api.get('/api/wallet/status').then(d=>setSupported(d.claims||[])); },[]);
+  const remove=async(id)=>{ if(!confirm('删除这个 Agent?'))return; await api.del('/api/profiles/'+id); reload(); };
+  return <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0, position:'relative' }}>
+    <Header title="档案" sub="为不同 Agent 设置不同的委托权限 · 外部 Agent 经 MCP 调用时受此约束"
+      actions={<Btn kind="primary" onClick={()=>setEditing({})}>+ 新建 Agent</Btn>}/>
+    <div style={{ flex:1, overflow:'auto', padding:28 }}>
+      {profiles.length===0
+        ? <div style={{ color:C.sub }}>还没有 Agent,点右上角「新建 Agent」开始。</div>
+        : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:18 }}>
+        {profiles.map((p,i)=><div key={p.id} className="card fade" style={{ position:'relative', background:C.card,
+          border:'0.5px solid '+C.border, borderRadius:18, padding:18, paddingTop:22, boxShadow:C.shadowMd,
+          overflow:'hidden', animationDelay:(i*0.04)+'s' }}>
+          <div style={{ position:'absolute', top:0, left:0, right:0, height:4, background:C.accentGrad }}/>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:44, height:44, borderRadius:13, background:C.accentSoft, color:C.accent,
+              display:'flex', alignItems:'center', justifyContent:'center' }}><Icon name="user" size={22}/></div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:18, fontWeight:700 }}>{p.name}</div>
+              <div style={{ fontSize:12, color:C.faint, fontFamily:'ui-monospace,Menlo,monospace' }}>{p.agent_id}</div>
+            </div>
+          </div>
+          {p.desc && <div style={{ fontSize:14, color:C.sub, marginTop:8, lineHeight:1.5 }}>{p.desc}</div>}
+          <div style={{ fontSize:12, color:C.faint, margin:'10px 0 4px' }}>授权披露</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            {(p.allowed_claims||[]).length===0 ? <Pill tone="warn">无授权属性</Pill>
+              : p.allowed_claims.map(c=><Pill key={c} tone="success">{claimLabel(c)}</Pill>)}
+          </div>
+          <div style={{ display:'flex', gap:8, marginTop:14, paddingTop:12, borderTop:'0.5px solid '+C.borderSoft }}>
+            <Btn kind="default" onClick={()=>setEditing(p)}>编辑</Btn>
+            <Btn kind="ghost" onClick={()=>remove(p.id)}>删除</Btn>
+          </div>
+        </div>)}
+      </div>}
+    </div>
+    {editing && <ProfileEditor initial={editing.id?editing:null} supported={supported}
+      onClose={()=>setEditing(null)} onSaved={()=>{ setEditing(null); reload(); }}/>}
+  </div>;
+}
+
+// ── 凭证 ────────────────────────────────────────────────────────
+function CredentialView() {
+  const [st,setSt]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const reload=()=>api.get('/api/wallet/status').then(setSt);
+  useEffect(()=>{ reload(); },[]);
+  const reissue=async()=>{ if(!confirm('重新颁发 mDoc?会替换当前凭证。'))return; setBusy(true);
+    await api.post('/api/wallet/reissue'); setBusy(false); reload(); };
+  return <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0 }}>
+    <Header title="凭证" sub="设备持有的 mDoc 凭证与可证明属性"
+      actions={<Btn kind="default" onClick={reissue} disabled={busy}>{busy?'颁发中…':'重发 mDoc'}</Btn>}/>
+    <div style={{ flex:1, overflow:'auto', padding:28 }}>
+      <Section title="mDoc 凭证" hint={st?(st.claims&&st.claims.length?'已持有':'未持有'):''}>
+        {!st ? <div style={{ color:C.sub }}>加载中…</div>
+          : (st.claims&&st.claims.length)
+          ? <div>
+              <div style={{ fontSize:14, color:C.sub, marginBottom:10 }}>可证明的属性(holder claim 别名):</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                {st.claims.map(c=><Pill key={c} tone="accent">{claimLabel(c)} · {c}</Pill>)}
+              </div>
+            </div>
+          : <div style={{ color:C.warn }}>尚未持有 mDoc,点右上「重发 mDoc」颁发。</div>}
+      </Section>
+    </div>
+  </div>;
+}
+
+// ── 委托 / 撤销 ─────────────────────────────────────────────────
+function RevokeView() {
+  const [profiles,setProfiles]=useState([]);
+  const [rev,setRev]=useState({pending:false});
+  const loadRev=()=>api.get('/api/wallet/revoke/status').then(setRev);
+  useEffect(()=>{ api.get('/api/profiles').then(setProfiles); loadRev(); },[]);
+  const revoke=async()=>{ await api.post('/api/wallet/revoke'); loadRev(); };
+  const clear=async()=>{ await api.post('/api/wallet/revoke/clear'); loadRev(); };
+  return <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0 }}>
+    <Header title="委托管理" sub="各 Agent 的委托策略 · 撤销"/>
+    <div style={{ flex:1, overflow:'auto', padding:28, display:'flex', flexDirection:'column', gap:18 }}>
+      <Section title="委托撤销 (consume-on-use)"
+        hint="撤销后,下一次任意 Agent 发起的委托会被验证方拒绝(Delegation revocation: FAIL)">
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          {rev.pending
+            ? <React.Fragment><Pill tone="danger">下次委托将被撤销</Pill><Btn kind="default" onClick={clear}>取消撤销</Btn></React.Fragment>
+            : <React.Fragment><Pill tone="success">委托有效</Pill><Btn danger onClick={revoke}>撤销下一次委托</Btn></React.Fragment>}
+        </div>
+      </Section>
+      <Section title="各 Agent 的委托策略">
+        {profiles.length===0 ? <div style={{ color:C.sub }}>暂无 Agent,请先到「档案」创建。</div>
+          : <div style={{ display:'flex', flexDirection:'column' }}>
+          {profiles.map((p,i)=><div key={p.id} style={{ display:'grid', gridTemplateColumns:'1.2fr 1.6fr 1fr auto',
+            alignItems:'center', gap:12, padding:'12px 0', borderTop:i===0?'none':'0.5px solid '+C.borderSoft }}>
+            <div><div style={{ fontSize:15, fontWeight:600 }}>{p.name}</div>
+              <div style={{ fontSize:12, color:C.faint, fontFamily:'ui-monospace,Menlo,monospace' }}>{p.agent_id}</div></div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {(p.allowed_claims||[]).length===0 ? <Pill tone="warn">无授权属性</Pill>
+                : p.allowed_claims.map(c=><Pill key={c} tone="success">{claimLabel(c)}</Pill>)}</div>
+            <div style={{ fontSize:12, color:C.sub, fontFamily:'ui-monospace,Menlo,monospace' }}>到期 {(p.expires||'').slice(0,10)}</div>
+            <Pill tone="neutral">有效</Pill>
+          </div>)}
+        </div>}
+      </Section>
+    </div>
+  </div>;
+}
+
+// ── 日志 ────────────────────────────────────────────────────────
+function Stat({ label, value, accent }) {
+  return <div style={{ flex:1, background:C.card, border:'0.5px solid '+C.borderSoft, borderRadius:14, padding:18, boxShadow:C.shadow }}>
+    <div style={{ fontSize:30, fontWeight:800, color:accent?C.accent:C.text, letterSpacing:'-0.02em' }}>{value}</div>
+    <div style={{ fontSize:14, color:C.sub, marginTop:2 }}>{label}</div>
+  </div>;
+}
+function LogsView() {
+  const [log,setLog]=useState([]);
+  const reload=()=>api.get('/api/agent/log').then(d=>setLog(Array.isArray(d)?d:[]));
+  useEffect(()=>{ reload(); },[]);
+  const accepted=log.filter(e=>e.status==='done'&&e.accepted).length;
+  const bytes=log.reduce((s,e)=>s+(e.proof_size||0),0);
+  return <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0 }}>
+    <Header title="日志" sub="真实的零知识证明出示记录(含外部 Agent 经 MCP 触发)"
+      actions={<Btn kind="default" onClick={reload}>刷新</Btn>}/>
+    <div style={{ flex:1, overflow:'auto', padding:28, display:'flex', flexDirection:'column', gap:18 }}>
+      <div style={{ display:'flex', gap:12 }}>
+        <Stat label="总出示次数" value={log.length} accent/>
+        <Stat label="验证通过" value={accepted}/>
+        <Stat label="证明总量" value={fmtKB(bytes)}/>
+      </div>
+      {log.length===0 ? <div style={{ textAlign:'center', color:C.sub, padding:40 }}>还没有出示记录。外部 Agent 经 MCP 下单后会在此出现。</div>
+        : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {log.map(e=>{ const ok=e.status==='done'&&e.accepted; const tone=ok?C.success:C.danger;
+          return <div key={e.task_id} className="card fade" style={{ display:'flex', alignItems:'center', gap:14,
+            padding:'12px 18px', borderRadius:14, background:C.card, border:'0.5px solid '+C.borderSoft, boxShadow:C.shadow }}>
+          <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center',
+            background:'color-mix(in oklab,'+tone+' 14%, transparent)', color:tone, fontSize:19, fontWeight:800 }}>{ok?'✓':'✕'}</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:15, fontWeight:700 }}>{e.hotel_name||(e.status==='failed'?'证明失败':'出示')}</span>
+              <Pill tone="accent">{e.agent_id||'Agent'}</Pill>
+            </div>
+            <div style={{ fontSize:12, color:C.faint, fontFamily:'ui-monospace,Menlo,monospace', marginTop:2 }}>{fmtTs(e.ts)} · #{e.task_id}</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:6 }}>
+              {(e.claims||[]).map(c=><Pill key={c} tone="success">{claimLabel(c)}</Pill>)}
+              {e.status==='failed' && <span style={{ fontSize:12, color:C.danger }}>{e.error}</span>}
+            </div>
+          </div>
+          <div style={{ textAlign:'right' }}>
+            {ok?<Pill tone="success">✓ ACCEPT</Pill>:<Pill tone="danger">{e.status==='failed'?'FAILED':'REJECT'}</Pill>}
+            <div style={{ fontSize:12, color:C.faint, fontFamily:'ui-monospace,Menlo,monospace', marginTop:6 }}>{fmtKB(e.proof_size)}</div>
+          </div>
+        </div>; })}
+      </div>}
+    </div>
+  </div>;
+}
+
+// ── MCP 接入 ────────────────────────────────────────────────────
+function McpView() {
+  const [info,setInfo]=useState(null);
+  const [wallet,setWallet]=useState(null);
+  const [copied,setCopied]=useState(false);
+  useEffect(()=>{ api.get('/api/mcp/info').then(setInfo); api.get('/api/wallet/status').then(setWallet); },[]);
+  const snippet = info && JSON.stringify({ mcpServers: { [info.server_name]: {
+    command: info.python_path, args:[info.server_path], env:{ WALLET_BASE: info.wallet_base } } } }, null, 2);
+  const copy=()=>{ navigator.clipboard.writeText(snippet).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),1500); }); };
+  const dot=(ok)=><span style={{ width:8, height:8, borderRadius:'50%', background:ok?C.success:C.danger, display:'inline-block', marginRight:7 }}/>;
+  return <div style={{ display:'flex', flexDirection:'column', height:'100%', minHeight:0 }}>
+    <Header title="MCP 接入" sub="把这个钱包作为 MCP 服务接入 Claude Desktop / Hermes / openclaw"/>
+    <div style={{ flex:1, overflow:'auto', padding:28, display:'flex', flexDirection:'column', gap:18, maxWidth:760 }}>
+      <Section title="状态自检">
+        <div style={{ fontSize:15, lineHeight:2 }}>
+          <div>{dot(true)}Wallet 在线(本页正连着 {info?info.wallet_base:'…'})</div>
+          <div>{dot(wallet&&wallet.claims&&wallet.claims.length)}mDoc 凭证{wallet&&wallet.claims&&wallet.claims.length?'已就绪':'未就绪 — 去「凭证」重发'}</div>
+          <div style={{ color:C.sub, fontSize:13 }}>提示:MCP 工具运行时需要 TripGo 商家(:8003)在线,即 `make demo` 已起两个服务。</div>
+        </div>
+      </Section>
+      <Section title="配置片段" hint="粘贴进宿主的 MCP 配置后重启宿主">
+        <div style={{ position:'relative' }}>
+          <pre style={{ background:'#1c1c20', color:'#e8e8ee', borderRadius:12, padding:16, fontSize:13,
+            fontFamily:'ui-monospace,Menlo,monospace', margin:0, lineHeight:1.5 }}>{snippet||'加载中…'}</pre>
+          <div style={{ position:'absolute', top:10, right:10 }}>
+            <Btn kind="primary" onClick={copy} style={{ padding:'5px 12px', fontSize:13 }}>{copied?'已复制 ✓':'复制'}</Btn>
+          </div>
+        </div>
+        <div style={{ fontSize:13, color:C.sub, marginTop:12, lineHeight:1.7 }}>
+          · Claude Desktop:写入 <code>claude_desktop_config.json</code> 的 mcpServers。<br/>
+          · 调试:<code>cd web &amp;&amp; ./.venv/bin/python -m mcp dev mcp_server/server.py</code> 打开 Inspector。<br/>
+          · TripGo 上云:在 wallet 侧设 <code>TRIPGO_BASE=https://你的域名</code> 后重启,MCP 配置不变。
+        </div>
+      </Section>
+      <Section title="可用工具">
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {info && info.tools.map(t=><div key={t.name} style={{ display:'flex', gap:12, alignItems:'baseline',
+            padding:'8px 0', borderTop:'0.5px solid '+C.borderSoft }}>
+            <code style={{ fontSize:14, fontWeight:700, color:C.accent, minWidth:150 }}>{t.name}</code>
+            <span style={{ fontSize:14, color:C.sub }}>{t.desc}</span>
+          </div>)}
+        </div>
+      </Section>
+    </div>
+  </div>;
+}
+
+// ── shell ───────────────────────────────────────────────────────
+const NAV = [
+  { id:'profiles', label:'档案', icon:'user', view:ProfilesView },
+  { id:'creds', label:'凭证', icon:'card', view:CredentialView },
+  { id:'revoke', label:'委托管理', icon:'shield', view:RevokeView },
+  { id:'logs', label:'日志', icon:'list', view:LogsView },
+  { id:'mcp', label:'MCP 接入', icon:'plug', view:McpView },
+];
+function App() {
+  const [route,setRoute]=useState('profiles');
+  const View = (NAV.find(n=>n.id===route)||NAV[0]).view;
+  return <React.Fragment>
+    <div style={{ width:260, height:'100%', flexShrink:0, background:'rgba(248,246,242,0.7)',
+      backdropFilter:'blur(36px) saturate(160%)', WebkitBackdropFilter:'blur(36px) saturate(160%)',
+      borderRight:'0.5px solid '+C.borderSoft, display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:'22px 18px 16px', display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ width:34, height:34, borderRadius:10, background:C.accentGrad, color:'#fff',
+          display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800 }}>Z</div>
+        <div>
+          <div style={{ fontSize:18, fontWeight:800 }}>管理台</div>
+          <div style={{ fontSize:12, color:C.faint, fontFamily:'ui-monospace,Menlo,monospace' }}>权限 / 凭证 / MCP</div>
+        </div>
+      </div>
+      <div style={{ flex:1, padding:'4px 10px', display:'flex', flexDirection:'column', gap:3 }}>
+        {NAV.map(n=>{ const sel=route===n.id; return <button key={n.id} onClick={()=>setRoute(n.id)} style={{
+          appearance:'none', border:0, font:'inherit', textAlign:'left', display:'flex', alignItems:'center', gap:13,
+          padding:'11px 12px', borderRadius:10, cursor:'pointer', fontSize:18, fontWeight:sel?600:500, color:C.text,
+          background:sel?'rgba(0,0,0,0.06)':'transparent' }}>
+          <span style={{ width:32, height:32, borderRadius:9, flexShrink:0, display:'flex', alignItems:'center',
+            justifyContent:'center', background:sel?C.accent:C.chip, color:sel?'#fff':C.sub }}><Icon name={n.icon}/></span>
+          <span style={{ flex:1 }}>{n.label}</span>
+        </button>; })}
+      </div>
+      <div style={{ padding:14, borderTop:'0.5px solid '+C.borderSoft, fontSize:13 }}>
+        <a href="/" style={{ color:C.sub, textDecoration:'none' }}>← 返回 Web Demo</a>
+      </div>
+    </div>
+    <div style={{ flex:1, minWidth:0, height:'100%', display:'flex', flexDirection:'column' }}><View/></div>
+  </React.Fragment>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
