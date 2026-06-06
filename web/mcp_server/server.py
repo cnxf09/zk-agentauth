@@ -11,7 +11,7 @@ disclose) lives in the wallet's profiles; `book_hotel` can never disclose anythi
 outside the chosen Agent's `allowed_claims` — that is enforced by the ZK circuit.
 
 Run standalone for debugging:  python mcp_server/server.py
-Usually the host launches it; see mcp_server/README.md for the config snippet.
+Usually the host launches it; see the repo root README.md for the config snippet.
 """
 from __future__ import annotations
 
