@@ -42,6 +42,7 @@ class MdocSignature {
   using v256 = typename LogicCircuit::v256;
   using Ecdsa = VerifyCircuit<LogicCircuit, Field, EC>;
   using EcdsaWitness = typename Ecdsa::Witness;
+  using Sm2Witness = typename Ecdsa::Sm2Witness;
   using MacBitPlucker = BitPlucker<LogicCircuit, kMACPluckerBits>;
   using packed_v256 = typename MacBitPlucker::packed_v256;
   using mac = MAC<LogicCircuit, MacBitPlucker>;
@@ -97,6 +98,48 @@ class MdocSignature {
     }
   };
 
+  class DelegationOnlyWitness {
+   public:
+    EltW delegation_e_;
+    EltW revocation_status_e_;
+    EcdsaWitness delegation_sig_;
+    EcdsaWitness revocation_sig_;
+    EcdsaWitness agent_sig_;
+    MACWitness delegation_mac_;
+    MACWitness revocation_status_mac_;
+
+    void input(const LogicCircuit& lc) {
+      delegation_e_ = lc.eltw_input();
+      revocation_status_e_ = lc.eltw_input();
+      delegation_sig_.input(lc);
+      revocation_sig_.input(lc);
+      agent_sig_.input(lc);
+      delegation_mac_.input(lc);
+      revocation_status_mac_.input(lc);
+    }
+  };
+
+  class StandardSm2DelegationOnlyWitness {
+   public:
+    EltW delegation_e_;
+    EltW revocation_status_e_;
+    Sm2Witness delegation_sig_;
+    Sm2Witness revocation_sig_;
+    Sm2Witness agent_sig_;
+    MACWitness delegation_mac_;
+    MACWitness revocation_status_mac_;
+
+    void input(const LogicCircuit& lc) {
+      delegation_e_ = lc.eltw_input();
+      revocation_status_e_ = lc.eltw_input();
+      delegation_sig_.input(lc);
+      revocation_sig_.input(lc);
+      agent_sig_.input(lc);
+      delegation_mac_.input(lc);
+      revocation_status_mac_.input(lc);
+    }
+  };
+
   explicit MdocSignature(const LogicCircuit& lc, const EC& ec, const Nat& order)
       : lc_(lc), ec_(ec), order_(order) {}
 
@@ -141,6 +184,52 @@ class MdocSignature {
     ecc.verify_signature3(vw.mdoc_.dpkx_, vw.mdoc_.dpky_,
                           vw.revocation_status_e_, vw.revocation_sig_);
     ecc.verify_signature3(agent_pkX, agent_pkY, hash_tr, vw.agent_sig_);
+    macc.verify_mac(vw.delegation_e_, mac_delegation_e, a_v,
+                    vw.delegation_mac_, order_);
+    macc.verify_mac(vw.revocation_status_e_, mac_revocation_status_e, a_v,
+                    vw.revocation_status_mac_, order_);
+  }
+
+  void assert_mdoc_signatures_only(EltW pkX, EltW pkY, EltW hash_tr,
+                                   v128 mac_e[2], v128 mac_dpkX[2],
+                                   v128 mac_dpkY[2], v128 a_v,
+                                   Witness& vw) const {
+    assert_signatures(pkX, pkY, hash_tr, mac_e, mac_dpkX, mac_dpkY, a_v,
+                      vw);
+  }
+
+  void assert_delegation_signatures_only(EltW device_pkX, EltW device_pkY,
+                                         EltW hash_tr, EltW agent_pkX,
+                                         EltW agent_pkY,
+                                         v128 mac_delegation_e[2],
+                                         v128 mac_revocation_status_e[2],
+                                         v128 a_v,
+                                         DelegationOnlyWitness& vw) const {
+    Ecdsa ecc(lc_, ec_, order_);
+    mac macc(lc_);
+    ecc.verify_signature3(device_pkX, device_pkY, vw.delegation_e_,
+                          vw.delegation_sig_);
+    ecc.verify_signature3(device_pkX, device_pkY, vw.revocation_status_e_,
+                          vw.revocation_sig_);
+    ecc.verify_signature3(agent_pkX, agent_pkY, hash_tr, vw.agent_sig_);
+    macc.verify_mac(vw.delegation_e_, mac_delegation_e, a_v,
+                    vw.delegation_mac_, order_);
+    macc.verify_mac(vw.revocation_status_e_, mac_revocation_status_e, a_v,
+                    vw.revocation_status_mac_, order_);
+  }
+
+  void assert_standard_sm2_delegation_signatures_only(
+      EltW device_pkX, EltW device_pkY, EltW agent_e, EltW agent_pkX,
+      EltW agent_pkY, v128 mac_delegation_e[2],
+      v128 mac_revocation_status_e[2], v128 a_v,
+      StandardSm2DelegationOnlyWitness& vw) const {
+    Ecdsa ecc(lc_, ec_, order_);
+    mac macc(lc_);
+    ecc.verify_sm2_signature(device_pkX, device_pkY, vw.delegation_e_,
+                             vw.delegation_sig_);
+    ecc.verify_sm2_signature(device_pkX, device_pkY, vw.revocation_status_e_,
+                             vw.revocation_sig_);
+    ecc.verify_sm2_signature(agent_pkX, agent_pkY, agent_e, vw.agent_sig_);
     macc.verify_mac(vw.delegation_e_, mac_delegation_e, a_v,
                     vw.delegation_mac_, order_);
     macc.verify_mac(vw.revocation_status_e_, mac_revocation_status_e, a_v,

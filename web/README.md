@@ -2,7 +2,7 @@
 
 Wallet（Alice 钱包，:8002）+ TripGo（验证方/商家，:8003）两个 Flask 服务，外加单文件 React Client UI 与 Service UI。
 
-跨服务流程：Alice 把 mDoc 凭证的部分声明委托给 AI Agent，Agent 携 P-256 委托签名 + ~350 KB Ligero v2 ZK 证明跨服务调用 TripGo 完成下单；TripGo 验证后无法回溯 Alice 真实身份。
+跨服务流程：Alice 把 mDoc 凭证的部分声明委托给 AI Agent，Agent 携 SM2/SM3 委托材料 + Ligero v2 ZK 证明跨服务调用 TripGo 完成下单；TripGo 验证后无法回溯 Alice 真实身份。
 
 ## 架构
 
@@ -67,7 +67,7 @@ make demo         # 等价 ./start.sh
 
 1. http://localhost:8002 → 「Agent」→「购书助手」 → 输入「帮我订外滩璞丽酒店」 → 发送
 2. 弹出 ProvingOverlay → 实时观察 5 阶段时间线 + Prover 实时日志：
-   - ① delegating · 生成 P-256 委托签名 + delegation_revocation_status.json
+   - ① delegating · 生成 SM2/SM3 委托材料与委托撤销状态
    - ② fetching_request · 跨服务 POST :8003/oid4vp/request 取 OID4VP 展示请求
    - ③ proving · 生成 Ligero v2 ZK 证明（~5 秒），proof.bin 实际尺寸（~350 KB）回填
    - ④ posting · direct_post 投递 :8003/oid4vp/response

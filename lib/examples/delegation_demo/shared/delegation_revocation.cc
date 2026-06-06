@@ -82,7 +82,7 @@ void AppendUint64Be(uint64_t v, std::vector<uint8_t>* out) {
 }
 
 bool ComputeStatusDigestHex(const DelegationRevocationStatus& status,
-                            std::string* digest_hex,
+                            bool use_sm3, std::string* digest_hex,
                             std::string* err) {
   std::vector<uint8_t> delegation_id;
   if (!HexToBytes(status.delegation_id_hex, &delegation_id, err)) {
@@ -109,8 +109,12 @@ bool ComputeStatusDigestHex(const DelegationRevocationStatus& status,
   msg.push_back(status.revoked ? 1 : 0);
 
   std::vector<uint8_t> digest;
-  if (!Sha256Digest(msg.data(), msg.size(), &digest)) {
-    if (err != nullptr) *err = "SHA256 computation failed";
+  const bool digest_ok = use_sm3 ? Sm3Digest(msg.data(), msg.size(), &digest)
+                                 : Sha256Digest(msg.data(), msg.size(), &digest);
+  if (!digest_ok) {
+    if (err != nullptr) {
+      *err = use_sm3 ? "SM3 computation failed" : "SHA256 computation failed";
+    }
     return false;
   }
   *digest_hex = HexPrefixed(digest.data(), digest.size());
@@ -146,6 +150,33 @@ bool ComputeDelegationIdHex(const std::string& delegation_msg_hex,
   return true;
 }
 
+bool ComputeDelegationIdHexSm3(const std::string& delegation_msg_hex,
+                               std::string* delegation_id_hex,
+                               std::string* err) {
+  std::vector<uint8_t> delegation_msg;
+  if (!HexToBytes(delegation_msg_hex, &delegation_msg, err)) {
+    return false;
+  }
+  if (delegation_msg.size() != 32) {
+    if (err != nullptr) *err = "delegation message must be 32 bytes";
+    return false;
+  }
+  static constexpr std::array<uint8_t, 8> kDomain = {
+      'Z', 'K', 'D', 'E', 'L', 'I', 'D', '1'};
+  std::vector<uint8_t> msg;
+  msg.reserve(kDomain.size() + delegation_msg.size());
+  msg.insert(msg.end(), kDomain.begin(), kDomain.end());
+  msg.insert(msg.end(), delegation_msg.begin(), delegation_msg.end());
+
+  std::vector<uint8_t> digest;
+  if (!Sm3Digest(msg.data(), msg.size(), &digest)) {
+    if (err != nullptr) *err = "SM3 computation failed";
+    return false;
+  }
+  *delegation_id_hex = HexPrefixed(digest.data(), digest.size());
+  return true;
+}
+
 bool CreateDelegationRevocationStatus(
     const std::string& device_sk_hex,
     const std::string& delegation_msg_hex,
@@ -163,10 +194,36 @@ bool CreateDelegationRevocationStatus(
   }
 
   std::string digest_hex;
-  if (!ComputeStatusDigestHex(*status, &digest_hex, err)) {
+  if (!ComputeStatusDigestHex(*status, false, &digest_hex, err)) {
     return false;
   }
   if (!SignDelegation(device_sk_hex, digest_hex, &status->sig_hex, err)) {
+    return false;
+  }
+  return true;
+}
+
+bool CreateDelegationRevocationStatusSm2(
+    const std::string& device_sk_hex,
+    const std::string& delegation_msg_hex,
+    uint64_t epoch,
+    const std::string& expires,
+    bool revoked,
+    DelegationRevocationStatus* status,
+    std::string* err) {
+  status->epoch = epoch;
+  status->expires = expires;
+  status->revoked = revoked;
+  if (!ComputeDelegationIdHexSm3(delegation_msg_hex, &status->delegation_id_hex,
+                                 err)) {
+    return false;
+  }
+
+  std::string digest_hex;
+  if (!ComputeStatusDigestHex(*status, true, &digest_hex, err)) {
+    return false;
+  }
+  if (!SignDelegationSm2(device_sk_hex, digest_hex, &status->sig_hex, err)) {
     return false;
   }
   return true;
@@ -188,12 +245,50 @@ bool VerifyDelegationRevocationStatus(
     return false;
   }
   std::string digest_hex;
-  if (!ComputeStatusDigestHex(status, &digest_hex, err)) {
+  if (!ComputeStatusDigestHex(status, false, &digest_hex, err)) {
     return false;
   }
   if (!VerifyDelegationSig(device_pkx_hex, device_pky_hex, digest_hex,
                            status.sig_hex, err)) {
     if (err != nullptr) *err = "revocation status signature invalid: " + *err;
+    return false;
+  }
+  if (status.revoked) {
+    if (err != nullptr) *err = "delegation is revoked";
+    return false;
+  }
+  if (status.expires <= now_iso8601) {
+    if (err != nullptr) {
+      *err = "revocation status expired (expires=" + status.expires +
+             ", now=" + now_iso8601 + ")";
+    }
+    return false;
+  }
+  return true;
+}
+
+bool VerifyDelegationRevocationStatusSm2(
+    const DelegationRevocationStatus& status,
+    const std::string& device_pkx_hex,
+    const std::string& device_pky_hex,
+    const std::string& delegation_msg_hex,
+    const std::string& now_iso8601,
+    std::string* err) {
+  std::string expected_id;
+  if (!ComputeDelegationIdHexSm3(delegation_msg_hex, &expected_id, err)) {
+    return false;
+  }
+  if (status.delegation_id_hex != expected_id) {
+    if (err != nullptr) *err = "SM2 delegation revocation status id mismatch";
+    return false;
+  }
+  std::string digest_hex;
+  if (!ComputeStatusDigestHex(status, true, &digest_hex, err)) {
+    return false;
+  }
+  if (!VerifyDelegationSigSm2(device_pkx_hex, device_pky_hex, digest_hex,
+                              status.sig_hex, err)) {
+    if (err != nullptr) *err = "SM2 revocation status signature invalid: " + *err;
     return false;
   }
   if (status.revoked) {

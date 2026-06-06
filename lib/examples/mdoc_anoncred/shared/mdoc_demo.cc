@@ -151,6 +151,20 @@ const ZkSpecStruct* FindRequestSpec(const ReaderRequest& request,
   return spec;
 }
 
+const ZkSpecStruct* FindDelegatedSmSpec(size_t num_attributes,
+                                        std::string* err) {
+  for (size_t i = 0; i < kNumZkSpecs; ++i) {
+    if (std::strcmp(kZkSpecs[i].system, "zk-agentauth-sm-delegation-v1") == 0 &&
+        kZkSpecs[i].num_attributes == num_attributes) {
+      return &kZkSpecs[i];
+    }
+  }
+  if (err != nullptr) {
+    *err = "failed to resolve delegated SM zk spec";
+  }
+  return nullptr;
+}
+
 bool OverwriteFixedBytes(std::vector<uint8_t>* doc, size_t pos,
                          const std::vector<uint8_t>& value, size_t expected_len,
                          std::string* err) {
@@ -429,6 +443,57 @@ bool BuildDelegatedReaderRequest(const MdocIssuerPublicBundle& issuer_public,
   return true;
 }
 
+bool BuildDelegatedSmReaderRequest(const MdocIssuerPublicBundle& issuer_public,
+                                   const std::vector<std::string>& claim_aliases,
+                                   ReaderRequest* request, std::string* err) {
+  if (claim_aliases.empty() || claim_aliases.size() > 2) {
+    if (err != nullptr) {
+      *err = "mdoc demo supports 1 or 2 claims";
+    }
+    return false;
+  }
+  request->claims.clear();
+  for (const std::string& alias : claim_aliases) {
+    ReaderClaim claim;
+    if (!BuildReaderClaimForIssuer(issuer_public, alias, &claim, err)) {
+      return false;
+    }
+    request->claims.push_back(claim);
+  }
+  request->num_attributes = request->claims.size();
+  request->doc_type = issuer_public.doc_type;
+  request->now_iso8601 = issuer_public.now_iso8601;
+  request->client_id = issuer_public.client_id;
+  request->response_uri = issuer_public.response_uri;
+  if (!GenerateOpenId4VpSessionTranscript(&request->transcript_bytes,
+                                          &request->nonce_hex, err)) {
+    return false;
+  }
+  request->state = request->nonce_hex;
+
+  const ZkSpecStruct* spec = FindDelegatedSmSpec(request->num_attributes, err);
+  if (spec == nullptr) return false;
+  uint8_t* circuit = nullptr;
+  size_t circuit_len = 0;
+  CircuitGenerationErrorCode gen_ret =
+      generate_delegated_circuit(spec, &circuit, &circuit_len);
+  if (gen_ret != CIRCUIT_GENERATION_SUCCESS) {
+    if (err != nullptr) {
+      *err = "failed to generate delegated SM mdoc circuit";
+    }
+    return false;
+  }
+  request->zk_system = spec->system;
+  request->circuit_hash = spec->circuit_hash;
+  request->circuit_bytes.assign(circuit, circuit + circuit_len);
+  std::free(circuit);
+  request->openid4vp_request_json = BuildOpenId4VpRequestJson(*request);
+  if (!EncodeReaderRequestCbor(*request, &request->request_cbor, err)) {
+    return false;
+  }
+  return true;
+}
+
 bool ProveMdocPresentation(const HolderMdoc& holder,
                            const MdocIssuerPublicBundle& issuer_public,
                            const ReaderRequest& request,
@@ -525,6 +590,71 @@ bool ProveDelegatedMdocPresentation(
   if (ret != MDOC_PROVER_SUCCESS) {
     if (err != nullptr) {
       *err = "delegated mdoc proof generation failed with code " + std::to_string(ret);
+    }
+    return false;
+  }
+  presentation->proof_bytes.assign(proof, proof + proof_len);
+  presentation->claim_aliases.clear();
+  presentation->disclosed_claims = resolved_claims;
+  for (const auto& claim : request.claims) {
+    presentation->claim_aliases.push_back(claim.alias);
+  }
+  std::free(proof);
+  return true;
+}
+
+bool ProveDelegatedSmMdocPresentation(
+    const HolderMdoc& holder, const MdocIssuerPublicBundle& issuer_public,
+    const ReaderRequest& request, const std::string& agent_pkx_sm2_hex,
+    const std::string& agent_pky_sm2_hex,
+    const std::vector<uint8_t>& delegation_sig_sm2,
+    const std::vector<uint8_t>& agent_sig_sm2,
+    const std::vector<uint8_t>& allowed_claim_hashes_padded,
+    size_t allowed_claim_count, const std::string& policy_expires,
+    const std::vector<uint8_t>& agent_id_hash,
+    const std::vector<uint8_t>& requested_claim_hashes,
+    const std::vector<uint8_t>& revocation_id,
+    const std::vector<uint8_t>& revocation_epoch_be,
+    const std::string& revocation_expires,
+    uint8_t revocation_revoked,
+    const std::vector<uint8_t>& revocation_sig_sm2,
+    MdocPresentation* presentation, std::string* err) {
+  std::vector<RequestedAttribute> attrs;
+  std::vector<ReaderClaim> resolved_claims;
+  if (!ResolveClaimValues(request.claims, holder.issued_claims, &resolved_claims, err)) {
+    return false;
+  }
+  ReaderRequest resolved_request = request;
+  resolved_request.claims = resolved_claims;
+  if (!BuildRequestedAttributes(resolved_request, &attrs, err)) {
+    return false;
+  }
+  const ZkSpecStruct* spec = FindRequestSpec(request, err);
+  if (spec == nullptr) return false;
+  std::vector<uint8_t> patched_response;
+  if (!PatchDynamicDeviceSignature(holder, request, &patched_response, err)) {
+    return false;
+  }
+  uint8_t* proof = nullptr;
+  size_t proof_len = 0;
+  MdocProverErrorCode ret = run_mdoc_delegated_sm_prover(
+      request.circuit_bytes.data(), request.circuit_bytes.size(),
+      patched_response.data(), patched_response.size(),
+      issuer_public.issuer_pkx_hex.c_str(), issuer_public.issuer_pky_hex.c_str(),
+      holder.device_sk_hex.c_str(), request.transcript_bytes.data(),
+      request.transcript_bytes.size(), attrs.data(), attrs.size(),
+      request.now_iso8601.c_str(), agent_pkx_sm2_hex.c_str(),
+      agent_pky_sm2_hex.c_str(), delegation_sig_sm2.data(),
+      delegation_sig_sm2.size(), agent_sig_sm2.data(), agent_sig_sm2.size(),
+      allowed_claim_hashes_padded.data(), allowed_claim_count,
+      policy_expires.c_str(), agent_id_hash.data(), requested_claim_hashes.data(),
+      revocation_id.data(), revocation_epoch_be.data(), revocation_expires.c_str(),
+      revocation_revoked, revocation_sig_sm2.data(), revocation_sig_sm2.size(),
+      &proof, &proof_len, spec);
+  if (ret != MDOC_PROVER_SUCCESS) {
+    if (err != nullptr) {
+      *err = "delegated SM mdoc proof generation failed with code " +
+             std::to_string(ret);
     }
     return false;
   }
@@ -637,6 +767,67 @@ MdocVerificationResult VerifyDelegatedMdocPresentation(
   result.message = result.ok
                        ? "ok"
                        : ("delegated mdoc verification failed with code " +
+                          std::to_string(ret));
+  return result;
+}
+
+MdocVerificationResult VerifyDelegatedSmMdocPresentation(
+    const MdocIssuerPublicBundle& issuer_public, const ReaderRequest& request,
+    const MdocPresentation& presentation, const std::string& agent_pkx_sm2_hex,
+    const std::string& agent_pky_sm2_hex,
+    const std::vector<uint8_t>& allowed_claim_hashes_padded,
+    size_t allowed_claim_count, const std::string& policy_expires,
+    const std::vector<uint8_t>& agent_id_hash,
+    const std::vector<uint8_t>& requested_claim_hashes,
+    const std::vector<uint8_t>& revocation_id,
+    const std::vector<uint8_t>& revocation_epoch_be,
+    const std::string& revocation_expires,
+    uint8_t revocation_revoked) {
+  MdocVerificationResult result;
+  if (presentation.claim_aliases.size() != request.claims.size()) {
+    result.message = "presentation claim count mismatch";
+    return result;
+  }
+  for (size_t i = 0; i < presentation.claim_aliases.size(); ++i) {
+    if (presentation.claim_aliases[i] != request.claims[i].alias) {
+      result.message = "presentation claim alias mismatch";
+      return result;
+    }
+  }
+  std::string err;
+  std::vector<RequestedAttribute> attrs;
+  std::vector<ReaderClaim> resolved_claims;
+  if (!ResolveClaimValues(request.claims, presentation.disclosed_claims,
+                          &resolved_claims, &err)) {
+    result.message = err;
+    return result;
+  }
+  ReaderRequest resolved_request = request;
+  resolved_request.claims = resolved_claims;
+  if (!BuildRequestedAttributes(resolved_request, &attrs, &err)) {
+    result.message = err;
+    return result;
+  }
+  const ZkSpecStruct* spec = FindRequestSpec(request, &err);
+  if (spec == nullptr) {
+    result.message = err;
+    return result;
+  }
+  MdocVerifierErrorCode ret = run_mdoc_delegated_sm_verifier(
+      request.circuit_bytes.data(), request.circuit_bytes.size(),
+      issuer_public.issuer_pkx_hex.c_str(), issuer_public.issuer_pky_hex.c_str(),
+      request.transcript_bytes.data(), request.transcript_bytes.size(), attrs.data(),
+      attrs.size(), request.now_iso8601.c_str(), presentation.proof_bytes.data(),
+      presentation.proof_bytes.size(), request.doc_type.c_str(),
+      agent_pkx_sm2_hex.c_str(), agent_pky_sm2_hex.c_str(),
+      allowed_claim_hashes_padded.data(), allowed_claim_count,
+      policy_expires.c_str(), agent_id_hash.data(), requested_claim_hashes.data(),
+      revocation_id.data(), revocation_epoch_be.data(), revocation_expires.c_str(),
+      revocation_revoked, spec);
+  result.ok = ret == MDOC_VERIFIER_SUCCESS;
+  result.message = result.ok
+                       ? "ok"
+                       : ("delegated SM mdoc verification failed with code " +
                           std::to_string(ret));
   return result;
 }

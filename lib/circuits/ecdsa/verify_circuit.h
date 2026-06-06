@@ -66,8 +66,53 @@ class VerifyCircuit {
     }
   };
 
+  struct Sm2Witness {
+    EltW qx, qy;
+    EltW r, s, t, e_mod, qx_mod;
+    EltW r_inv, s_inv, t_inv, pk_inv;
+    EltW t_carry, r_carry, e_carry, qx_carry;
+    EltW pre[8];
+    EltW bi[kBits];
+    EltW int_x[kBits - 1];
+    EltW int_y[kBits - 1];
+    EltW int_z[kBits - 1];
+
+    void input(const LogicCircuit& lc) {
+      qx = lc.eltw_input();
+      qy = lc.eltw_input();
+      r = lc.eltw_input();
+      s = lc.eltw_input();
+      t = lc.eltw_input();
+      e_mod = lc.eltw_input();
+      qx_mod = lc.eltw_input();
+      r_inv = lc.eltw_input();
+      s_inv = lc.eltw_input();
+      t_inv = lc.eltw_input();
+      pk_inv = lc.eltw_input();
+      t_carry = lc.eltw_input();
+      r_carry = lc.eltw_input();
+      e_carry = lc.eltw_input();
+      qx_carry = lc.eltw_input();
+      for (size_t i = 0; i < 8; ++i) {
+        pre[i] = lc.eltw_input();
+      }
+      for (size_t i = 0; i < kBits; ++i) {
+        bi[i] = lc.eltw_input();
+        if (i < kBits - 1) {
+          int_x[i] = lc.eltw_input();
+          int_y[i] = lc.eltw_input();
+          int_z[i] = lc.eltw_input();
+        }
+      }
+    }
+  };
+
   VerifyCircuit(const LogicCircuit& lc, const EC& ec, const Nat& order)
-      : lc_(lc), ec_(ec), k2_(lc_.elt(2)), k3_(lc_.elt(3)) {
+      : lc_(lc),
+        ec_(ec),
+        order_(lc_.konst(ec_.f_.to_montgomery(order))),
+        k2_(lc_.elt(2)),
+        k3_(lc_.elt(3)) {
     // Compute the bit representation of the order of the curve.
     for (size_t i = 0; i < ec.kBits; ++i) {
       bits_n_[i] = lc_.bit(order.bit(i));
@@ -237,7 +282,150 @@ class VerifyCircuit {
     lc_.assert1(s_range);
   }
 
+  // Verify the standard SM2 relation for a signature (r,s) on message digest e:
+  //   t = (r + s) mod n, t != 0
+  //   Q = [s]G + [t]P
+  //   r = (e + x_Q) mod n
+  //
+  // The SM3/ZA computation that produces e is intentionally outside this
+  // prime-field circuit and should be MAC-bound from the hash circuit.
+  void verify_sm2_signature(EltW pk_x, EltW pk_y, EltW e,
+                            const Sm2Witness& w) const {
+    EltW zero = lc_.konst(lc_.zero());
+    EltW one = lc_.konst(lc_.one());
+    EltW gx = lc_.konst(ec_.gx_), gy = lc_.konst(ec_.gy_);
+
+    enum PreIndex {
+      GPK_X = 0,
+      GPK_Y,
+      GQ_X,
+      GQ_Y,
+      QPK_X,
+      QPK_Y,
+      GQPK_X,
+      GQPK_Y
+    };
+
+    EltW cg_pkx, cg_pky, cg_pkz;
+    EltW cq_gx, cq_gy, cq_gz;
+    EltW cq_pkx, cq_pky, cq_pkz;
+    EltW cq_g_pkx, cq_g_pky, cq_g_pkz;
+    addE(cg_pkx, cg_pky, cg_pkz, gx, gy, one, pk_x, pk_y, one);
+    addE(cq_gx, cq_gy, cq_gz, w.qx, w.qy, one, gx, gy, one);
+    addE(cq_pkx, cq_pky, cq_pkz, w.qx, w.qy, one, pk_x, pk_y, one);
+    addE(cq_g_pkx, cq_g_pky, cq_g_pkz, gx, gy, one, w.pre[QPK_X],
+         w.pre[QPK_Y], one);
+    point_equality(cg_pkx, cg_pky, cg_pkz, w.pre[GPK_X], w.pre[GPK_Y]);
+    point_equality(cq_gx, cq_gy, cq_gz, w.pre[GQ_X], w.pre[GQ_Y]);
+    point_equality(cq_pkx, cq_pky, cq_pkz, w.pre[QPK_X], w.pre[QPK_Y]);
+    point_equality(cq_g_pkx, cq_g_pky, cq_g_pkz, w.pre[GQPK_X],
+                   w.pre[GQPK_Y]);
+
+    EltW arr_x[] = {zero, gx,          pk_x,         w.pre[GPK_X],
+                    w.qx, w.pre[GQ_X], w.pre[QPK_X], w.pre[GQPK_X]};
+    EltW arr_y[] = {one,  gy,          pk_y,         w.pre[GPK_Y],
+                    w.qy, w.pre[GQ_Y], w.pre[QPK_Y], w.pre[GQPK_Y]};
+    EltW arr_z[] = {zero, one, one, one, one, one, one, one};
+    EltW arr_s[] = {zero, one, zero, one, zero, one, zero, one};
+    EltW arr_t[] = {zero, zero, one, one, zero, zero, one, one};
+    EltW arr_mone[] = {zero, zero, zero, zero, one, one, one, one};
+    EltW arr_v[] = {zero, zero, zero, zero, zero, zero, zero, zero, one};
+
+    EltMuxer<LogicCircuit, 8> xx(lc_, arr_x);
+    EltMuxer<LogicCircuit, 8> yy(lc_, arr_y);
+    EltMuxer<LogicCircuit, 8> zz(lc_, arr_z);
+    EltMuxer<LogicCircuit, 8> ss(lc_, arr_s);
+    EltMuxer<LogicCircuit, 8> tt(lc_, arr_t);
+    EltMuxer<LogicCircuit, 8> mm(lc_, arr_mone);
+    EltMuxer<LogicCircuit, 9, 8> vv(lc_, arr_v);
+
+    EltW sst = zero, tst = zero, mst = zero;
+    EltW ax = zero, ay = one, az = zero;
+    Bitvec s_bits, t_bits;
+    for (size_t i = 0; i < kBits; ++i) {
+      EltW tx = xx.mux(w.bi[i]);
+      EltW ty = yy.mux(w.bi[i]);
+      EltW tz = zz.mux(w.bi[i]);
+
+      EltW s_bi = ss.mux(w.bi[i]);
+      EltW t_bi = tt.mux(w.bi[i]);
+      EltW m_bi = mm.mux(w.bi[i]);
+      auto k2 = lc_.konst(k2_);
+      sst = lc_.add(&s_bi, lc_.mul(&k2, sst));
+      tst = lc_.add(&t_bi, lc_.mul(&k2, tst));
+      mst = lc_.add(&m_bi, lc_.mul(&k2, mst));
+      s_bits[kBits - i - 1] = BitW(s_bi, ec_.f_);
+      t_bits[kBits - i - 1] = BitW(t_bi, ec_.f_);
+
+      EltW range = vv.mux(w.bi[i]);
+      lc_.assert0(range);
+      if (i > 0) {
+        doubleE(ax, ay, az, ax, ay, az);
+      }
+      addE(ax, ay, az, ax, ay, az, tx, ty, tz);
+      if (i < kBits - 1) {
+        lc_.assert_eq(&ax, w.int_x[i]);
+        lc_.assert_eq(&ay, w.int_y[i]);
+        lc_.assert_eq(&az, w.int_z[i]);
+        ax = w.int_x[i];
+        ay = w.int_y[i];
+        az = w.int_z[i];
+      }
+    }
+
+    lc_.assert0(ax);
+    lc_.assert0(az);
+    lc_.assert_eq(&sst, w.s);
+    lc_.assert_eq(&tst, w.t);
+    auto order_minus_one = lc_.sub(&order_, one);
+    lc_.assert_eq(&mst, order_minus_one);
+
+    is_on_curve(pk_x, pk_y);
+    is_on_curve(w.qx, w.qy);
+    assert_nonzero(pk_x, w.pk_inv);
+    assert_nonzero(w.r, w.r_inv);
+    assert_nonzero(w.s, w.s_inv);
+    assert_nonzero(w.t, w.t_inv);
+    lc_.assert1(lc_.vlt(&s_bits, bits_n_));
+    lc_.assert1(lc_.vlt(&t_bits, bits_n_));
+
+    assert_bit(w.t_carry);
+    assert_bit(w.r_carry);
+    assert_bit(w.e_carry);
+    assert_bit(w.qx_carry);
+    auto rs = lc_.add(&w.r, w.s);
+    auto tn = lc_.add(&w.t, lc_.mul(&w.t_carry, order_));
+    lc_.assert_eq(&rs, tn);
+    auto emodn = lc_.add(&w.e_mod, lc_.mul(&w.e_carry, order_));
+    lc_.assert_eq(&e, emodn);
+    auto qxmodn = lc_.add(&w.qx_mod, lc_.mul(&w.qx_carry, order_));
+    lc_.assert_eq(&w.qx, qxmodn);
+    auto eqx = lc_.add(&w.e_mod, w.qx_mod);
+    auto rn = lc_.add(&w.r, lc_.mul(&w.r_carry, order_));
+    lc_.assert_eq(&eqx, rn);
+  }
+
  private:
+  void assert_bit(EltW x) const {
+    auto one = lc_.konst(lc_.one());
+    auto xm1 = lc_.sub(&x, one);
+    auto bit_poly = lc_.mul(&x, xm1);
+    lc_.assert0(bit_poly);
+  }
+
+  void assert_carry_0_to_3(EltW x) const {
+    auto one = lc_.konst(lc_.one());
+    auto two = lc_.konst(k2_);
+    auto three = lc_.konst(k3_);
+    auto xm1 = lc_.sub(&x, one);
+    auto xm2 = lc_.sub(&x, two);
+    auto xm3 = lc_.sub(&x, three);
+    auto p = lc_.mul(&x, xm1);
+    p = lc_.mul(&p, xm2);
+    p = lc_.mul(&p, xm3);
+    lc_.assert0(p);
+  }
+
   void assert_nonzero(EltW x, EltW witness) const {
     auto maybe_one = lc_.mul(&x, witness);
     auto one = lc_.konst(lc_.one());
@@ -363,6 +551,7 @@ class VerifyCircuit {
   const LogicCircuit& lc_;
   const EC& ec_;
 
+  EltW order_;
   Elt k2_, k3_;
   Bitvec bits_n_;
 };

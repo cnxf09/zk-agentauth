@@ -25,6 +25,7 @@
 #include "circuits/logic/routing.h"
 #include "circuits/mdoc/mdoc_constants.h"
 #include "circuits/mdoc/mdoc_zk.h"
+#include "circuits/sha/flatsm3_circuit.h"
 #include "circuits/sha/flatsha256_circuit.h"
 
 namespace proofs {
@@ -53,7 +54,10 @@ class MdocHash {
 
   using Flatsha = FlatSHA256Circuit<LogicCircuit,
                                     BitPlucker<LogicCircuit, kSHAPluckerBits>>;
+  using Flatsm3 = FlatSM3Circuit<LogicCircuit,
+                                 BitPlucker<LogicCircuit, kSHAPluckerBits>>;
   using ShaBlockWitness = typename Flatsha::BlockWitness;
+  using Sm3BlockWitness = typename Flatsm3::BlockWitness;
   using sha_packed_v32 = typename Flatsha::packed_v32;
 
  public:
@@ -186,6 +190,37 @@ class MdocHash {
     }
   };
 
+  struct DelegationPolicySm3Witness {
+    Sm3BlockWitness delegation_msg_sm3[kDelegationMsgSHABlocks];
+    Sm3BlockWitness device_za_sm3[kSm2ZaMessageSM3Blocks];
+    Sm3BlockWitness delegation_sig_sm3[kSm2DigestMessageSM3Blocks];
+    Sm3BlockWitness revocation_id_sm3[kDelegationRevocationIdSHABlocks];
+    Sm3BlockWitness
+        revocation_status_sm3[kDelegationRevocationStatusSHABlocks];
+    Sm3BlockWitness revocation_sig_sm3[kSm2DigestMessageSM3Blocks];
+
+    void input(const LogicCircuit& lc) {
+      for (size_t i = 0; i < kDelegationMsgSHABlocks; ++i) {
+        delegation_msg_sm3[i].input(lc);
+      }
+      for (size_t i = 0; i < kSm2ZaMessageSM3Blocks; ++i) {
+        device_za_sm3[i].input(lc);
+      }
+      for (size_t i = 0; i < kSm2DigestMessageSM3Blocks; ++i) {
+        delegation_sig_sm3[i].input(lc);
+      }
+      for (size_t i = 0; i < kDelegationRevocationIdSHABlocks; ++i) {
+        revocation_id_sm3[i].input(lc);
+      }
+      for (size_t i = 0; i < kDelegationRevocationStatusSHABlocks; ++i) {
+        revocation_status_sm3[i].input(lc);
+      }
+      for (size_t i = 0; i < kSm2DigestMessageSM3Blocks; ++i) {
+        revocation_sig_sm3[i].input(lc);
+      }
+    }
+  };
+
   class Witness {
    public:
     v8 in_[64 * kMaxSHABlocks]; /* input bytes, 64 * MAX */
@@ -252,7 +287,7 @@ class MdocHash {
   };
 
   explicit MdocHash(const LogicCircuit& lc)
-      : lc_(lc), sha_(lc), r_(lc), cb_(lc) {}
+      : lc_(lc), sha_(lc), sm3_(lc), r_(lc), cb_(lc) {}
 
   void assert_valid_hash_mdoc(OpenedAttribute oa[/* NUM_ATTR */],
                               const v8 now[/*20*/], const v256& e,
@@ -365,22 +400,7 @@ class MdocHash {
                                 const v256& delegation_e,
                                 const v256& revocation_status_e,
                                 const DelegationPolicyWitness& vw) const {
-    const Memcmp<LogicCircuit> CMP(lc_);
-    lc_.vassert_is_bit(in.allowed_count);
-    lc_.assert1(lc_.vleq(in.allowed_count, kDelegationMaxClaims));
-    lc_.assert1(CMP.lt(kDelegationExpiresSize, now, in.expires));
-    lc_.vassert_eq(in.revocation_revoked, 0);
-    lc_.assert1(CMP.lt(kDelegationExpiresSize, now, in.revocation_expires));
-
-    for (const auto& requested : in.requested_claim_hashes) {
-      BitW allowed = lc_.bit(0);
-      for (size_t i = 0; i < kDelegationMaxClaims; ++i) {
-        BitW active = lc_.vlt(i, in.allowed_count);
-        BitW same = hash_eq(requested.data(), in.allowed_claim_hashes[i]);
-        allowed = lc_.lor(&allowed, lc_.land(&active, same));
-      }
-      lc_.assert1(allowed);
-    }
+    assert_delegation_policy_common(in, now);
 
     auto msg = construct_delegation_message(in);
     const v8 nb = lc_.template vbit<8>((kDelegationMsgSize + 9 + 63) / 64);
@@ -406,7 +426,83 @@ class MdocHash {
                              vw.revocation_status_sha);
   }
 
+  void assert_delegation_policy_sm3(
+      const DelegationPolicyInput& in, const v8 now[/*20*/],
+      const v256& dpkx, const v256& dpky, const v256& delegation_e,
+      const v256& revocation_status_e, const DelegationPolicySm3Witness& vw)
+      const {
+    assert_delegation_policy_common(in, now);
+
+    auto msg = construct_delegation_message(in);
+    const v8 nb = lc_.template vbit<8>((kDelegationMsgSize + 9 + 63) / 64);
+    sm3_.assert_message(kDelegationMsgSHABlocks, nb, msg.data(),
+                        vw.delegation_msg_sm3);
+    v256 delegation_digest = sm3_.hash_from_witness(
+        kDelegationMsgSHABlocks, nb, vw.delegation_msg_sm3);
+
+    auto device_za_msg =
+        construct_sm2_za_message(delegation_device_id(), dpkx, dpky);
+    const v8 za_nb = lc_.template vbit<8>(kSm2ZaMessageSM3Blocks);
+    sm3_.assert_message(kSm2ZaMessageSM3Blocks, za_nb,
+                        device_za_msg.data(), vw.device_za_sm3);
+    v256 device_za = sm3_.hash_from_witness(kSm2ZaMessageSM3Blocks, za_nb,
+                                            vw.device_za_sm3);
+
+    auto delegation_sig_msg =
+        construct_sm2_digest_signature_message(device_za, delegation_digest);
+    const v8 sig_nb = lc_.template vbit<8>(kSm2DigestMessageSM3Blocks);
+    sm3_.assert_message_hash(kSm2DigestMessageSM3Blocks, sig_nb,
+                             delegation_sig_msg.data(), delegation_e,
+                             vw.delegation_sig_sm3);
+
+    auto id_msg = construct_revocation_id_message(delegation_digest);
+    v256 revocation_id;
+    for (size_t i = 0; i < 256; ++i) {
+      revocation_id[i] = in.revocation_id[31 - (i / 8)][i % 8];
+    }
+    const v8 id_nb = lc_.template vbit<8>(
+        (kDelegationRevocationIdMsgSize + 9 + 63) / 64);
+    sm3_.assert_message_hash(kDelegationRevocationIdSHABlocks, id_nb,
+                             id_msg.data(), revocation_id,
+                             vw.revocation_id_sm3);
+
+    auto status_msg = construct_revocation_status_message(in);
+    const v8 status_nb = lc_.template vbit<8>(
+        (kDelegationRevocationStatusMsgSize + 9 + 63) / 64);
+    sm3_.assert_message(kDelegationRevocationStatusSHABlocks, status_nb,
+                        status_msg.data(), vw.revocation_status_sm3);
+    v256 revocation_status_digest = sm3_.hash_from_witness(
+        kDelegationRevocationStatusSHABlocks, status_nb,
+        vw.revocation_status_sm3);
+
+    auto revocation_sig_msg = construct_sm2_digest_signature_message(
+        device_za, revocation_status_digest);
+    sm3_.assert_message_hash(kSm2DigestMessageSM3Blocks, sig_nb,
+                             revocation_sig_msg.data(), revocation_status_e,
+                             vw.revocation_sig_sm3);
+  }
+
  private:
+  void assert_delegation_policy_common(const DelegationPolicyInput& in,
+                                       const v8 now[/*20*/]) const {
+    const Memcmp<LogicCircuit> CMP(lc_);
+    lc_.vassert_is_bit(in.allowed_count);
+    lc_.assert1(lc_.vleq(in.allowed_count, kDelegationMaxClaims));
+    lc_.assert1(CMP.lt(kDelegationExpiresSize, now, in.expires));
+    lc_.vassert_eq(in.revocation_revoked, 0);
+    lc_.assert1(CMP.lt(kDelegationExpiresSize, now, in.revocation_expires));
+
+    for (const auto& requested : in.requested_claim_hashes) {
+      BitW allowed = lc_.bit(0);
+      for (size_t i = 0; i < kDelegationMaxClaims; ++i) {
+        BitW active = lc_.vlt(i, in.allowed_count);
+        BitW same = hash_eq(requested.data(), in.allowed_claim_hashes[i]);
+        allowed = lc_.lor(&allowed, lc_.land(&active, same));
+      }
+      lc_.assert1(allowed);
+    }
+  }
+
   BitW hash_eq(const v8 a[/*32*/], const v8 b[/*32*/]) const {
     std::vector<BitW> abits(256);
     std::vector<BitW> bbits(256);
@@ -417,6 +513,64 @@ class MdocHash {
       }
     }
     return lc_.eq(abits.size(), abits.data(), bbits.data());
+  }
+
+  const uint8_t* delegation_device_id() const {
+    static constexpr uint8_t kDeviceId[kSm2UserIdSize] = {
+        'Z', 'K', 'A', 'A', '-', 'D', 'E', 'V',
+        'I', 'C', 'E', '-', '0', '0', '0', '1'};
+    return kDeviceId;
+  }
+
+  std::vector<v8> construct_sm2_za_message(
+      const uint8_t signer_id[kSm2UserIdSize], const v256& pkx,
+      const v256& pky) const {
+    static constexpr uint8_t kA[32] = {
+        0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfc};
+    static constexpr uint8_t kB[32] = {
+        0x28, 0xe9, 0xfa, 0x9e, 0x9d, 0x9f, 0x5e, 0x34,
+        0x4d, 0x5a, 0x9e, 0x4b, 0xcf, 0x65, 0x09, 0xa7,
+        0xf3, 0x97, 0x89, 0xf5, 0x15, 0xab, 0x8f, 0x92,
+        0xdd, 0xbc, 0xbd, 0x41, 0x4d, 0x94, 0x0e, 0x93};
+    static constexpr uint8_t kGx[32] = {
+        0x32, 0xc4, 0xae, 0x2c, 0x1f, 0x19, 0x81, 0x19,
+        0x5f, 0x99, 0x04, 0x46, 0x6a, 0x39, 0xc9, 0x94,
+        0x8f, 0xe3, 0x0b, 0xbf, 0xf2, 0x66, 0x0b, 0xe1,
+        0x71, 0x5a, 0x45, 0x89, 0x33, 0x4c, 0x74, 0xc7};
+    static constexpr uint8_t kGy[32] = {
+        0xbc, 0x37, 0x36, 0xa2, 0xf4, 0xf6, 0x77, 0x9c,
+        0x59, 0xbd, 0xce, 0xe3, 0x6b, 0x69, 0x21, 0x53,
+        0xd0, 0xa9, 0x87, 0x7c, 0xc6, 0x2a, 0x47, 0x40,
+        0x02, 0xdf, 0x32, 0xe5, 0x21, 0x39, 0xf0, 0xa0};
+    const v8 zero = lc_.template vbit<8>(0x00);
+    std::vector<v8> msg(64 * kSm2ZaMessageSM3Blocks, zero);
+    size_t p = 0;
+    auto put_const = [&](uint8_t b) { msg[p++] = lc_.template vbit<8>(b); };
+    put_const(0x00);
+    put_const(static_cast<uint8_t>(kSm2UserIdSize * 8));
+    for (size_t i = 0; i < kSm2UserIdSize; ++i) put_const(signer_id[i]);
+    for (uint8_t b : kA) put_const(b);
+    for (uint8_t b : kB) put_const(b);
+    for (uint8_t b : kGx) put_const(b);
+    for (uint8_t b : kGy) put_const(b);
+    put_v256_bytes(&msg, &p, pkx);
+    put_v256_bytes(&msg, &p, pky);
+    finish_sha_padding(&msg, &p, kSm2ZaMessageSize);
+    return msg;
+  }
+
+  std::vector<v8> construct_sm2_digest_signature_message(
+      const v256& za, const v256& digest) const {
+    const v8 zero = lc_.template vbit<8>(0x00);
+    std::vector<v8> msg(64 * kSm2DigestMessageSM3Blocks, zero);
+    size_t p = 0;
+    put_v256_be(&msg, &p, za);
+    put_v256_be(&msg, &p, digest);
+    finish_sha_padding(&msg, &p, kSm2DigestMessageSize);
+    return msg;
   }
 
   std::vector<v8> construct_delegation_message(
@@ -458,6 +612,16 @@ class MdocHash {
       v8 b;
       for (size_t j = 0; j < 8; ++j) {
         b[j] = e[(31 - i) * 8 + j];
+      }
+      (*msg)[(*p)++] = b;
+    }
+  }
+
+  void put_v256_bytes(std::vector<v8>* msg, size_t* p, const v256& e) const {
+    for (size_t i = 0; i < 32; ++i) {
+      v8 b;
+      for (size_t j = 0; j < 8; ++j) {
+        b[j] = e[i * 8 + j];
       }
       (*msg)[(*p)++] = b;
     }
@@ -776,6 +940,7 @@ class MdocHash {
 
   const LogicCircuit& lc_;
   Flatsha sha_;
+  Flatsm3 sm3_;
   Routing<LogicCircuit> r_;
   CborByteDecoder<LogicCircuit> cb_;
 };

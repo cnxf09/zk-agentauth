@@ -65,6 +65,7 @@ enum FieldID {
   GOLDI_ID = 8,
   FP64_2_ID = 9,
   SECP_ID = 10,
+  SM2_ID = 11,
 };
 
 template <class Field>

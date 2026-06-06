@@ -19,6 +19,10 @@ bool ComputeDelegationIdHex(const std::string& delegation_msg_hex,
                             std::string* delegation_id_hex,
                             std::string* err);
 
+bool ComputeDelegationIdHexSm3(const std::string& delegation_msg_hex,
+                               std::string* delegation_id_hex,
+                               std::string* err);
+
 bool CreateDelegationRevocationStatus(
     const std::string& device_sk_hex,
     const std::string& delegation_msg_hex,
@@ -28,7 +32,24 @@ bool CreateDelegationRevocationStatus(
     DelegationRevocationStatus* status,
     std::string* err);
 
+bool CreateDelegationRevocationStatusSm2(
+    const std::string& device_sk_hex,
+    const std::string& delegation_msg_hex,
+    uint64_t epoch,
+    const std::string& expires,
+    bool revoked,
+    DelegationRevocationStatus* status,
+    std::string* err);
+
 bool VerifyDelegationRevocationStatus(
+    const DelegationRevocationStatus& status,
+    const std::string& device_pkx_hex,
+    const std::string& device_pky_hex,
+    const std::string& delegation_msg_hex,
+    const std::string& now_iso8601,
+    std::string* err);
+
+bool VerifyDelegationRevocationStatusSm2(
     const DelegationRevocationStatus& status,
     const std::string& device_pkx_hex,
     const std::string& device_pky_hex,

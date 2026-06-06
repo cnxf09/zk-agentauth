@@ -1,6 +1,6 @@
 # ZK-AgentAuth
 
-基于零知识证明的 AI Agent 委托认证系统。Alice 把 mDoc 凭证里的部分声明授权给 AI Agent，Agent 携 P-256 委托签名 + Ligero v2 ZK 证明跨服务调用商家完成下单；商家可验证授权与属性正确性，但无法回溯 Alice 真实身份，也无法跨会话关联。
+基于零知识证明的 AI Agent 委托认证系统。Alice 把 mDoc 凭证里的部分声明授权给 AI Agent，Agent 携 SM2/SM3 委托材料与 Ligero v2 ZK 证明跨服务调用商家完成下单；商家可验证授权与属性正确性，但无法回溯 Alice 真实身份，也无法跨会话关联。
 
 ## 仓库结构
 
@@ -34,6 +34,8 @@ zk-agentauth/
 - **约束 10 · Agent 会话签名**：在签名电路中验证 Agent 临时密钥 `sk_agent` 对本次 session transcript / docType 摘要的 ECDSA 签名。
 - **约束 11 · 委托未撤销**：电路约束委托撤销状态由 `sk_d` 签发、`revoked == false` 且未过期；这是「Alice 撤销她对 Agent 的委托」语义，不是 Issuer 撤销凭证。
 - **通用谓词**：电路与应用层共同支持 `DISCLOSE / EQ / IN_SET / GE / LE`，按 AND 组合。
+
+当前国密 profile 为 `zk-agentauth-sm-delegation-v1`：委托、Agent 会话和委托撤销签名使用标准 SM2，SM2 的 `ZA/e` 以及委托策略相关摘要使用 SM3；mDoc issuer 签名与 circuit id 等非委托签名路径仍保留原有 P-256/SHA-256 兼容逻辑。
 
 更多电路细节见 `lib/examples/delegation_demo/` 的源码与上游 Longfellow ZK 的 README。
 

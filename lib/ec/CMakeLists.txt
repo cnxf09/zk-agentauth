@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(ec OBJECT p256.cc p256k1.cc)
+add_library(ec OBJECT p256.cc p256k1.cc sm2.cc)
 
 proofs_add_tests(elliptic_curve_test)

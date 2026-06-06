@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(flatsha OBJECT flatsha256_witness.cc sha256_constants.cc)
+add_library(flatsha OBJECT flatsha256_witness.cc sha256_constants.cc flatsm3_witness.cc)
 
 proofs_add_tests(flatsha256_circuit_test)
 target_link_libraries(flatsha256_circuit_test flatsha)

@@ -15,6 +15,7 @@ void Usage() {
       << "    --issuer-public <dir>   颁发方公开信息目录\n"
       << "    --claim <alias>         请求的 claim alias（可多次指定）\n"
       << "    --predicate <c:op:v>    请求并检查的谓词，如 height:GE:170\n"
+      << "    --sm                    使用 SM2/SM3 delegated profile\n"
       << "    --out <dir>             输出 request/ 目录\n"
       << "\n"
       << "  delegation_demo_verifier verify\n"
@@ -48,6 +49,13 @@ std::vector<std::string> GetFlagAll(int argc, char* argv[],
   return result;
 }
 
+bool HasFlag(int argc, char* argv[], const std::string& name) {
+  for (int i = 0; i < argc; ++i) {
+    if (std::string(argv[i]) == name) return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -61,6 +69,7 @@ int main(int argc, char* argv[]) {
   if (subcmd == "request") {
     const char* issuer_public_c = GetFlag(argc, argv, "--issuer-public");
     const char* out_c           = GetFlag(argc, argv, "--out");
+    const bool sm_profile       = HasFlag(argc, argv, "--sm");
     auto claims                 = GetFlagAll(argc, argv, "--claim");
     for (const auto& text : GetFlagAll(argc, argv, "--predicate")) {
       proofs::PolicyPredicate predicate;
@@ -86,9 +95,15 @@ int main(int argc, char* argv[]) {
     }
 
     std::string err;
-    if (!proofs::RunDelegationRequestCommand(
-            std::filesystem::path(issuer_public_c), claims,
-            std::filesystem::path(out_c), &err)) {
+    const bool ok =
+        sm_profile
+            ? proofs::RunDelegationSmRequestCommand(
+                  std::filesystem::path(issuer_public_c), claims,
+                  std::filesystem::path(out_c), &err)
+            : proofs::RunDelegationRequestCommand(
+                  std::filesystem::path(issuer_public_c), claims,
+                  std::filesystem::path(out_c), &err);
+    if (!ok) {
       std::cerr << "request failed: " << err << "\n";
       return 1;
     }

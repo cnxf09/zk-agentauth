@@ -34,3 +34,8 @@ if(PROOFS_BUILD_TESTS AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/delegation_demo_tes
   target_link_libraries(delegation_demo_test delegation_demo_lib)
   proofs_add_testing_libraries(delegation_demo_test)
 endif()
+
+if(PROOFS_BUILD_TESTS)
+  add_executable(delegation_crypto_smoke shared/delegation_crypto_smoke.cc)
+  target_link_libraries(delegation_crypto_smoke delegation_demo_lib)
+endif()

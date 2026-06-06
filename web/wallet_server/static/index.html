@@ -2773,7 +2773,7 @@ function SettingsPanel() {
 
 // ═══ Real Dispatch Overlay (SSE-based 5-phase progress) ══════════
 const PHASE_MAP = {
-  delegating:       { lbl: '① Alice 签发委托', det: '生成 P-256 委托签名 + policy.json' },
+  delegating:       { lbl: '① Alice 签发委托', det: '生成 SM2/SM3 委托材料与撤销状态' },
   fetching_request: { lbl: '② 向 TripGo 申请挑战', det: 'POST /oid4vp/request → 取回 OID4VP request' },
   proving:          { lbl: '③ 生成 ZK 证明', det: 'Ligero v2 · 哈希 + 签名约束 · 约 5s' },
   posting:          { lbl: '④ 投递订单', det: 'POST /oid4vp/response (direct_post) → 跨服务调用 TripGo' },

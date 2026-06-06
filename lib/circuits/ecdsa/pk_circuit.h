@@ -51,10 +51,17 @@ class Ecpk {
   // Verifies that (pkx, pky) = sk * G
   // The witness contains the bits of sk and intermediate points.
   void assert_public_key(EltW pk_x, EltW pk_y, const Witness& w) const {
+    (void)assert_public_key_and_scalar(pk_x, pk_y, w);
+  }
+
+  EltW assert_public_key_and_scalar(EltW pk_x, EltW pk_y,
+                                    const Witness& w) const {
     EltW zero = lc_.konst(lc_.zero());
     EltW one = lc_.konst(lc_.one());
+    EltW two = lc_.konst(lc_.elt(2));
     EltW gx = lc_.konst(ec_.gx_);
     EltW gy = lc_.konst(ec_.gy_);
+    EltW sk = zero;
 
     // Initialize at the point at infinity (0, 1, 0)
     EltW ax = zero, ay = one, az = zero;
@@ -63,6 +70,9 @@ class Ecpk {
     for (size_t i = 0; i < kBits; ++i) {
       typename LogicCircuit::BitW b_bit(w.bits[i], lc_.f_);
       lc_.assert_is_bit(b_bit);
+      EltW sk2 = lc_.mul(&two, sk);
+      EltW bitw = lc_.eval(b_bit);
+      sk = lc_.add(&sk2, bitw);
 
       // Select point to add based on bit: if 1 -> G, if 0 -> Infinity
       // Infinity = (0, 1, 0)
@@ -91,6 +101,7 @@ class Ecpk {
 
     // Also verify (pkx, pky) is on curve
     is_on_curve(pk_x, pk_y);
+    return sk;
   }
 
  private:

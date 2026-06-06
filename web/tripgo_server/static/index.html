@@ -301,7 +301,7 @@ function HexBadge({ size=120, label='VERIFIED' }) {
         <text x={c} y={c-7} textAnchor="middle" fill="#fff" fontSize={size>100?11:9} fontFamily="ui-monospace,monospace" fontWeight="700" letterSpacing="2">{label}</text>
         <path d={`M${c-13} ${c+5}L${c-3} ${c+14}L${c+13} ${c-7}`} fill="none" stroke="#fff" strokeWidth={size>100?3.5:2.5} strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
-      <span className="hex-lbl">ZK-AgentAuth · P-256 · Ligero v2</span>
+      <span className="hex-lbl">ZK-AgentAuth · SM2/SM3 delegation · Ligero v2</span>
     </div>
   );
 }
@@ -673,7 +673,7 @@ function HumanSuccess({ go, order }) {
 // ===== Agent Monitor (live feed from real ZK traffic) =====
 const FEED_DETAILS = {
   zk_proof:              { lbl:'ZK Proof',             det:'约束 ①–⑥ 通过 · Ligero v2 · ~350 KB' },
-  delegation_sig:        { lbl:'Delegation Sig',       det:'P-256 ECDSA · 委托签名有效' },
+  delegation_sig:        { lbl:'Delegation Sig',       det:'SM2/SM3 delegated profile · signature constraint valid' },
   policy_claims:         { lbl:'Policy / Claims',      det:'allowed_claims 覆盖 reader request' },
   policy_predicates:     { lbl:'Policy / Predicates',  det:'DISCLOSE / EQ / IN_SET / GE / LE 谓词全部满足' },
   policy_expiry:         { lbl:'Policy / Expiry',      det:'委托未过期' },
@@ -769,7 +769,7 @@ function AgentMonitor({ go }) {
             <div style={{marginTop:14,padding:'10px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:6,fontFamily:'var(--mono)',fontSize:11,color:'#6b7280',lineHeight:1.8}}>
               <div>POST /api/agent/order HTTP/1.1</div>
               <div>Content-Type: multipart/form-data</div>
-              <div>X-ZK-Protocol: ZK-AgentAuth-v1 · Ligero v2 / P-256</div>
+              <div>X-ZK-Protocol: ZK-AgentAuth-v1 · SM2/SM3 delegation + Ligero v2</div>
               <div style={{color: incoming ? '#16a34a' : '#9ca3af',marginTop:5}}>
                 Status: {phase==='idle' ? '待接收' : phase==='verifying' ? 'Verifying...' : (overallAccepted?'200 ACCEPT':'400 REJECT')} · {fmtTs(verified?.ts || incoming?.ts)}
               </div>

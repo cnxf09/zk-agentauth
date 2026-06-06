@@ -82,6 +82,14 @@ const ZkSpecStruct kZkSpecs[kNumZkSpecs] = {
     {"longfellow-libzk-v1",
      "fa5fadfb2a916d3b71144e9b412eff78f71fd6a6d4607eac10de66b195868b7a", 4, 5,
      4283, 2945},
+    // Experimental ZK-AgentAuth delegated SM profile: P-256 mDoc signature,
+    // standard SM2 delegation signatures, SM3 delegation hashes.
+    {"zk-agentauth-sm-delegation-v1",
+     "372b27cd63406d6fd7bc8b31234e09635aa883a961d70dbecf5a1e51600246e2", 1,
+     8, 4151, 4096},
+    {"zk-agentauth-sm-delegation-v1",
+     "aca7d9047ff24439cbfb20a7999c84b8c782b782e7e6729778ffe4519d167a57", 2,
+     8, 4265, 4096},
 
 };
 

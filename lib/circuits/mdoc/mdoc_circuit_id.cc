@@ -24,6 +24,7 @@
 #include "circuits/mdoc/mdoc_decompress.h"
 #include "circuits/mdoc/mdoc_zk.h"
 #include "ec/p256.h"
+#include "ec/sm2.h"
 #include "gf2k/gf2_128.h"
 #include "proto/circuit.h"
 #include "sumcheck/circuit_id.h"
@@ -35,6 +36,11 @@
 namespace proofs {
 
 using f_128 = GF2_128<>;
+
+bool IsSmDelegationSpecForCircuitId(const ZkSpecStruct* zk_spec) {
+  return zk_spec != nullptr &&
+         std::strcmp(zk_spec->system, "zk-agentauth-sm-delegation-v1") == 0;
+}
 
 extern "C" {
 
@@ -59,6 +65,17 @@ int circuit_id(uint8_t id[/*kSHA256DigestSize*/], const uint8_t* bcp,
   }
   circuit_id(cid, *c_sig, p256_base);
   sha.Update(cid, kSHA256DigestSize);
+
+  if (IsSmDelegationSpecForCircuitId(zk_spec)) {
+    CircuitRep<FpSM2Base> cr_sm2(sm2_base, SM2_ID);
+    auto c_sm2 = cr_sm2.from_bytes(rb_circuit, /*enforce_circuit_id=*/true);
+    if (c_sm2 == nullptr) {
+      log(ERROR, "SM2 signature circuit could not be parsed");
+      return 0;
+    }
+    circuit_id(cid, *c_sm2, sm2_base);
+    sha.Update(cid, kSHA256DigestSize);
+  }
 
   const f_128 Fs;
   CircuitRep<f_128> cr_h(Fs, GF2_128_ID);

@@ -44,6 +44,21 @@ bool RunDelegationRequestCommand(
   return WriteReaderRequestDir(out_dir, request, err);
 }
 
+bool RunDelegationSmRequestCommand(
+    const std::filesystem::path& issuer_public_dir,
+    const std::vector<std::string>& claim_aliases,
+    const std::filesystem::path& out_dir,
+    std::string* err) {
+  MdocIssuerPublicBundle issuer_public;
+  ReaderRequest request;
+  if (!ReadMdocIssuerPublicDir(issuer_public_dir, &issuer_public, err) ||
+      !BuildDelegatedSmReaderRequest(issuer_public, claim_aliases, &request,
+                                     err)) {
+    return false;
+  }
+  return WriteReaderRequestDir(out_dir, request, err);
+}
+
 // ----------------------------------------------------------------
 // D-2: 验证展示
 // ----------------------------------------------------------------
@@ -87,8 +102,16 @@ bool RunDelegationVerifyCommand(
   std::vector<uint8_t> allowed_hashes;
   std::vector<uint8_t> agent_id_hash;
   std::vector<uint8_t> requested_hashes;
-  if (!BuildDelegationCircuitInputs(policy, requested_aliases, &allowed_hashes,
-                                    &agent_id_hash, &requested_hashes, err)) {
+  const bool sm_profile = request.zk_system == "zk-agentauth-sm-delegation-v1";
+  const bool inputs_ok =
+      sm_profile
+          ? BuildDelegationCircuitInputsSm3(policy, requested_aliases,
+                                            &allowed_hashes, &agent_id_hash,
+                                            &requested_hashes, err)
+          : BuildDelegationCircuitInputs(policy, requested_aliases,
+                                         &allowed_hashes, &agent_id_hash,
+                                         &requested_hashes, err);
+  if (!inputs_ok) {
     return false;
   }
   std::vector<uint8_t> revocation_id_bytes;
@@ -97,12 +120,20 @@ bool RunDelegationVerifyCommand(
     return false;
   }
 
-  const MdocVerificationResult zk_result = VerifyDelegatedMdocPresentation(
-      issuer_public, request, presentation, agent_pkx, agent_pky,
-      allowed_hashes, policy.allowed_claims.size(), policy.expires,
-      agent_id_hash, requested_hashes, revocation_id_bytes,
-      Uint64Be(revocation_status.epoch), revocation_status.expires,
-      revocation_status.revoked ? 1 : 0);
+  const MdocVerificationResult zk_result =
+      sm_profile
+          ? VerifyDelegatedSmMdocPresentation(
+                issuer_public, request, presentation, agent_pkx, agent_pky,
+                allowed_hashes, policy.allowed_claims.size(), policy.expires,
+                agent_id_hash, requested_hashes, revocation_id_bytes,
+                Uint64Be(revocation_status.epoch), revocation_status.expires,
+                revocation_status.revoked ? 1 : 0)
+          : VerifyDelegatedMdocPresentation(
+                issuer_public, request, presentation, agent_pkx, agent_pky,
+                allowed_hashes, policy.allowed_claims.size(), policy.expires,
+                agent_id_hash, requested_hashes, revocation_id_bytes,
+                Uint64Be(revocation_status.epoch), revocation_status.expires,
+                revocation_status.revoked ? 1 : 0);
 
   std::string predicate_err;
   const bool predicates_ok =

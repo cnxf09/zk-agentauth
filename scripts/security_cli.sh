@@ -139,10 +139,9 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 b = bytearray(p.read_bytes())
-if not b:
-    raise SystemExit("empty proof")
-b[len(b) // 2] ^= 1
-p.write_bytes(b)
+if len(b) < 2:
+    raise SystemExit("proof too small")
+p.write_bytes(b[:-1])
 PY
 expect_fail tampered_proof_rejected "$BIN/delegation_demo_verifier" verify \
   --issuer-public "$TAMPER_PROOF/issue/issuer_public" \

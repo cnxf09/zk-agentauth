@@ -14,6 +14,12 @@ bool RunDelegationRequestCommand(
     const std::filesystem::path& out_dir,
     std::string* err);
 
+bool RunDelegationSmRequestCommand(
+    const std::filesystem::path& issuer_public_dir,
+    const std::vector<std::string>& claim_aliases,
+    const std::filesystem::path& out_dir,
+    std::string* err);
+
 // D-2 结构化验证结果
 struct DelegationVerificationResult {
   bool zk_proof_ok = false;        // 约束①-⑥：ZK 证明有效

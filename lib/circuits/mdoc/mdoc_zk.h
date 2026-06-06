@@ -155,11 +155,16 @@ static const size_t kDelegationRevocationStatusMsgSize =
     kDelegationRevocationFlagSize;
 static const size_t kDelegationRevocationIdSHABlocks = 1;
 static const size_t kDelegationRevocationStatusSHABlocks = 2;
+static const size_t kSm2UserIdSize = 16;
+static const size_t kSm2ZaMessageSize = 2 + kSm2UserIdSize + 32 * 6;
+static const size_t kSm2ZaMessageSM3Blocks = 4;
+static const size_t kSm2DigestMessageSize = 64;
+static const size_t kSm2DigestMessageSM3Blocks = 2;
 
 // An upper-bound on the decompressed circuit size. It is better to make this
 // bound tight to avoid memory failure in the resource restricted Android
 // gmscore environment.
-static const size_t kCircuitSizeMax = 150000000;
+static const size_t kCircuitSizeMax = 220000000;
 
 // The run_mdoc2_prover method takes byte-oriented inputs that describe a
 // circuit, mdoc, the public key of the issuer for the mdoc, a transcript
@@ -227,6 +232,34 @@ MdocVerifierErrorCode run_mdoc_delegated_verifier(
     const char* revocation_expires, uint8_t revocation_revoked,
     const ZkSpecStruct* zk_spec_version);
 
+MdocProverErrorCode run_mdoc_delegated_sm_prover(
+    const uint8_t* bcp, size_t bcsz, const uint8_t* mdoc, size_t mdoc_len,
+    const char* pkx, const char* pky, const char* device_sk,
+    const uint8_t* transcript, size_t tr_len, const RequestedAttribute* attrs,
+    size_t attrs_len, const char* now, const char* agent_pkx_sm2,
+    const char* agent_pky_sm2, const uint8_t* delegation_sig_sm2,
+    size_t delegation_sig_sm2_len, const uint8_t* agent_sig_sm2,
+    size_t agent_sig_sm2_len, const uint8_t* allowed_claim_hashes,
+    size_t allowed_claim_count, const char* policy_expires,
+    const uint8_t* agent_id_hash, const uint8_t* requested_claim_hashes,
+    const uint8_t* revocation_id, const uint8_t* revocation_epoch_be,
+    const char* revocation_expires, uint8_t revocation_revoked,
+    const uint8_t* revocation_sig_sm2, size_t revocation_sig_sm2_len,
+    uint8_t** prf, size_t* proof_len,
+    const ZkSpecStruct* zk_spec_version);
+
+MdocVerifierErrorCode run_mdoc_delegated_sm_verifier(
+    const uint8_t* bcp, size_t bcsz, const char* pkx, const char* pky,
+    const uint8_t* transcript, size_t tr_len, const RequestedAttribute* attrs,
+    size_t attrs_len, const char* now, const uint8_t* zkproof,
+    size_t proof_len, const char* docType, const char* agent_pkx_sm2,
+    const char* agent_pky_sm2, const uint8_t* allowed_claim_hashes,
+    size_t allowed_claim_count, const char* policy_expires,
+    const uint8_t* agent_id_hash, const uint8_t* requested_claim_hashes,
+    const uint8_t* revocation_id, const uint8_t* revocation_epoch_be,
+    const char* revocation_expires, uint8_t revocation_revoked,
+    const ZkSpecStruct* zk_spec_version);
+
 // Produces a compressed version of the circuit bytes for the specified number
 // of attributes. The generator only supports the latest version of the ZKSpec
 // for a number of attributes. Attempt to generate older circuits will result in
@@ -245,7 +278,7 @@ CircuitGenerationErrorCode generate_delegated_circuit(
 int circuit_id(uint8_t id[/*kSHA256DigestSize*/], const uint8_t* bcp,
                size_t bcsz, const ZkSpecStruct* zk_spec);
 
-enum { kNumZkSpecs = 12 };
+enum { kNumZkSpecs = 14 };
 // This is a hardcoded list of all the ZK specifications supported by this
 // library. Every time a new breaking change is introduced in either the circuit
 // format or its interpretation, a new version must be added here.
