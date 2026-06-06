@@ -40,7 +40,7 @@ cd web && make demo      # 起 wallet:8002 + tripgo:8003,自动颁发 mDoc 并�
 ### 2 · 接入其他 AI Agent(MCP 服务)
 
 把匿名委托能力作为 **MCP 服务(stdio)** 暴露,Claude Desktop / Hermes / openclaw 等加一段
-配置即可复用,宿主侧零代码。MCP server 是对运行中的 `wallet_server`(:8002)的薄代理。
+配置即可复用。MCP server 是对运行中的 `wallet_server`(:8002)的薄代理。
 
 **前置**:先 `cd web && make demo` 起后端并保持运行(下单需 TripGo 在线)。
 
@@ -100,19 +100,6 @@ $BIN/delegation_demo_verifier verify --issuer-public $WORK/issue/issuer_public \
 预期 6 项检查全 PASS、`Overall: ACCEPT`。example 3 自带 4 个 claim(age_over_18 /
 family_name / birth_date / height);谓词支持 `DISCLOSE / EQ / IN_SET / GE / LE`,
 当前 ZK 规格单次最多组合 2 个 claim。
-
-## 仓库结构
-
-```
-zk-agentauth/
-├── lib/                      # C++ ZK 库 + delegation_demo 四个 CLI(派生自 Longfellow ZK)
-├── web/
-│   ├── mcp_server/server.py  # MCP 服务(stdio),供外部 Agent 复用
-│   ├── wallet_server/        # Flask :8002(Issuer+Alice+Agent+Client UI+/manage)
-│   ├── tripgo_server/        # Flask :8003(验证方/商家+Service UI)
-│   └── data/                 # 运行时数据(mDoc / 订单 / 任务,自动生成)
-└── docs/                     # 设计与测试文档
-```
 
 ## 致谢
 
