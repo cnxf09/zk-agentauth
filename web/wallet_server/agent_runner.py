@@ -201,7 +201,7 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
         predicates = p.get("predicates") or []
         revoked = bool(p.get("revoked"))
         task.emit("delegating",
-                  message="Alice 创建委托 (P-256 ECDSA 签名)",
+                  message="Alice 创建委托 (SM2/SM3 签名)",
                   claims=p["claims"], agent_id=p["agent_id"],
                   expires=p["expires"], predicates=predicates,
                   revoked=revoked)

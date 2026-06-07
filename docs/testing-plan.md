@@ -75,8 +75,8 @@ scripts/security_cli.sh
 
 ```text
 result,test
-PASS,baseline_present
-PASS,baseline_verify
+PASS,sm_present
+PASS,sm_verify
 PASS,revoked_delegation_rejected
 PASS,expired_policy_rejected
 PASS,unsatisfied_predicate_rejected

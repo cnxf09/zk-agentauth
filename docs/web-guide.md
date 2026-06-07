@@ -292,7 +292,7 @@ curl --noproxy '*' http://localhost:8002/profiles/vp-token/zkaa-ligero-v1
 | GET  | `/api/agent/feed/history` | feed 历史（in-memory，重启清零） |
 | GET  | `/api/orders/<id>` | 订单详情 |
 
-`/oid4vp/request` 仍复用 `delegation_demo_verifier request` 生成现有 `reader_request.cbor` / `session_transcript.cbor`，外层补上 `client_id`、`response_mode=direct_post`、`state`、`presentation_definition`、`client_metadata_uri` 等字段，并生成 RS256 JWS `request_object_jwt`。请求体也可传 `authorization_details`；TripGo 会从其中派生 `claims/predicates` 并写入 request object 与 metadata。`reader_request_zip_b64` 是当前原型给 prover 复用旧目录格式的兼容扩展。
+`/oid4vp/request` 复用 `delegation_demo_verifier request` 生成 SM2/SM3 delegated profile 的 `reader_request.cbor` / `session_transcript.cbor`，外层补上 `client_id`、`response_mode=direct_post`、`state`、`presentation_definition`、`client_metadata_uri` 等字段，并生成 RS256 JWS `request_object_jwt`。请求体也可传 `authorization_details`；TripGo 会从其中派生 `claims/predicates` 并写入 request object 与 metadata。`reader_request_zip_b64` 是当前原型给 prover 复用目录格式的扩展。
 
 `zkaa+ligero` VP Token profile：
 
@@ -430,7 +430,7 @@ web/
 | Verifier 输出行 | 含义 | 在 ZK 电路里？ |
 |---|---|---|
 | `ZK proof` | Ligero v2 见证-证明数学正确 | 是 |
-| `Delegation sig` | 设备 sk_d 对委托消息的 ECDSA 签名 | 是（约束 7） |
+| `Delegation sig` | 设备 sk_d 对委托消息的 SM2/SM3 签名 | 是（约束 7） |
 | `Policy claims` | 披露的 claim 在 policy.allowed_claims 里 | 是（约束 8） |
 | `Policy predicates` | 通用谓词（DISCLOSE/EQ/IN_SET/GE/LE）通过 | 是 |
 | `Policy expiry` | now < policy.expires | 是（约束 9） |

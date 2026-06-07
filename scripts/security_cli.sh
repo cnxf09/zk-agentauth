@@ -84,14 +84,14 @@ setup_base() {
 
 printf "result,test\n"
 
-BASE="$WORK/baseline"
+BASE="$WORK/sm_default"
 setup_base "$BASE"
-expect_ok baseline_present "$BIN/delegation_demo_agent" present \
+expect_ok sm_present "$BIN/delegation_demo_agent" present \
   --delegation "$BASE/delegation" \
   --issuer-public "$BASE/issue/issuer_public" \
   --request "$BASE/request" \
   --out "$BASE/presentation"
-expect_ok baseline_verify "$BIN/delegation_demo_verifier" verify \
+expect_ok sm_verify "$BIN/delegation_demo_verifier" verify \
   --issuer-public "$BASE/issue/issuer_public" \
   --request "$BASE/request" \
   --presentation "$BASE/presentation"

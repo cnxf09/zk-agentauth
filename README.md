@@ -93,7 +93,7 @@ WORK=/tmp/zkaa_cli; BIN=$(pwd)/build/examples/delegation_demo; rm -rf $WORK
 $BIN/delegation_demo_issuer issue --example 3 --out $WORK/issue
 $BIN/delegation_demo_alice delegate --holder $WORK/issue/holder --claim age_over_18 \
   --expires 2027-01-01T00:00:00Z --agent-id bookstore-agent --out $WORK/delegation
-$BIN/delegation_demo_verifier request --sm --issuer-public $WORK/issue/issuer_public \
+$BIN/delegation_demo_verifier request --issuer-public $WORK/issue/issuer_public \
   --claim age_over_18 --out $WORK/request
 $BIN/delegation_demo_agent present --delegation $WORK/delegation \
   --issuer-public $WORK/issue/issuer_public --request $WORK/request --out $WORK/presentation
@@ -103,8 +103,8 @@ $BIN/delegation_demo_verifier verify --issuer-public $WORK/issue/issuer_public \
 
 预期 6 项检查全 PASS、`Overall: ACCEPT`。example 3 自带 4 个 claim(age_over_18 /
 family_name / birth_date / height);谓词支持 `DISCLOSE / EQ / IN_SET / GE / LE`,
-当前 ZK 规格单次最多组合 2 个 claim。不加 `request --sm` 时仍可运行原 P-256/SHA-256
-baseline profile,用于兼容和回归对照。
+当前 ZK 规格单次最多组合 2 个 claim。业务默认使用 SM2/SM3 delegated profile;如需临时
+回归旧路径,可显式传 `request --legacy-p256`。
 
 ## 致谢
 

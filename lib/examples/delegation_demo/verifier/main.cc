@@ -15,7 +15,7 @@ void Usage() {
       << "    --issuer-public <dir>   颁发方公开信息目录\n"
       << "    --claim <alias>         请求的 claim alias（可多次指定）\n"
       << "    --predicate <c:op:v>    请求并检查的谓词，如 height:GE:170\n"
-      << "    --sm                    使用 SM2/SM3 delegated profile\n"
+      << "    --legacy-p256           使用旧 P-256/SHA-256 delegated profile\n"
       << "    --out <dir>             输出 request/ 目录\n"
       << "\n"
       << "  delegation_demo_verifier verify\n"
@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
   if (subcmd == "request") {
     const char* issuer_public_c = GetFlag(argc, argv, "--issuer-public");
     const char* out_c           = GetFlag(argc, argv, "--out");
-    const bool sm_profile       = HasFlag(argc, argv, "--sm");
+    const bool sm_profile       = !HasFlag(argc, argv, "--legacy-p256");
     auto claims                 = GetFlagAll(argc, argv, "--claim");
     for (const auto& text : GetFlagAll(argc, argv, "--predicate")) {
       proofs::PolicyPredicate predicate;

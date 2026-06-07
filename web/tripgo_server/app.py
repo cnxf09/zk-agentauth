@@ -266,7 +266,7 @@ def _build_presentation_definition(claims: list[str]) -> dict:
                 "purpose": "Submit one zkaa+ligero VP token bound to this OID4VP request nonce and state.",
                 "format": {
                     "zkaa+ligero": {
-                        "alg": ["P-256+Ligero"],
+                        "alg": ["SM2/SM3+Ligero"],
                         "profile": ZKAA_LIGERO_PROFILE,
                         "encoding": "application/zip;base64",
                         "proof_type": "LigeroV2",

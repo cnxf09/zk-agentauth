@@ -101,64 +101,16 @@ bool RunAgentPresentCommand(const std::filesystem::path& delegation_dir,
     return false;
   }
 
-  DelegationRevocationStatus revocation_status;
-  if (!ReadDelegationRevocationStatusJson(
-          delegation_dir / "delegation_revocation_status.json",
-          &revocation_status, err)) {
-    if (err != nullptr) *err = "failed to read delegation revocation status: " + *err;
-    return false;
-  }
-  if (!VerifyDelegationRevocationStatus(
-          revocation_status, holder.device_pkx_hex, holder.device_pky_hex,
-          del_msg, request.now_iso8601, err)) {
-    if (err != nullptr) *err = "delegation revocation check failed: " + *err;
-    return false;
-  }
-
   std::vector<std::string> requested_aliases;
   requested_aliases.reserve(request.claims.size());
   for (const auto& claim : request.claims) {
     requested_aliases.push_back(claim.alias);
   }
 
-  std::vector<uint8_t> allowed_hashes;
-  std::vector<uint8_t> agent_id_hash;
-  std::vector<uint8_t> requested_hashes;
-  if (!BuildDelegationCircuitInputs(policy, requested_aliases, &allowed_hashes,
-                                    &agent_id_hash, &requested_hashes, err)) {
-    return false;
-  }
-
-  std::vector<uint8_t> del_sig_bytes;
-  if (!HexToBytes(del_sig, &del_sig_bytes, err)) {
-    return false;
-  }
-  std::vector<uint8_t> revocation_sig_bytes;
-  if (!HexToBytes(revocation_status.sig_hex, &revocation_sig_bytes, err)) {
-    return false;
-  }
-  std::vector<uint8_t> revocation_id_bytes;
-  if (!HexToBytes(revocation_status.delegation_id_hex, &revocation_id_bytes,
-                  err)) {
-    return false;
-  }
-  const std::vector<uint8_t> revocation_epoch_be =
-      Uint64Be(revocation_status.epoch);
-
-  std::vector<uint8_t> agent_digest;
-  if (!ComputeDeviceAuthenticationDigest(request.transcript_bytes,
-                                         request.doc_type, &agent_digest,
-                                         err)) {
-    return false;
-  }
-  std::vector<uint8_t> agent_sig_bytes;
-  if (!SignSha256DigestP256(agent_sk, agent_digest, &agent_sig_bytes, err)) {
-    return false;
-  }
-  const std::string agent_sig = HexPrefixed(agent_sig_bytes.data(),
-                                           agent_sig_bytes.size());
-
   if (request.zk_system == "zk-agentauth-sm-delegation-v1") {
+    std::vector<uint8_t> allowed_hashes;
+    std::vector<uint8_t> agent_id_hash;
+    std::vector<uint8_t> requested_hashes;
     if (!BuildDelegationCircuitInputsSm3(policy, requested_aliases,
                                          &allowed_hashes, &agent_id_hash,
                                          &requested_hashes, err)) {
@@ -255,6 +207,55 @@ bool RunAgentPresentCommand(const std::filesystem::path& delegation_dir,
       return false;
     }
     return true;
+  }
+
+  std::vector<uint8_t> allowed_hashes;
+  std::vector<uint8_t> agent_id_hash;
+  std::vector<uint8_t> requested_hashes;
+  if (!BuildDelegationCircuitInputs(policy, requested_aliases, &allowed_hashes,
+                                    &agent_id_hash, &requested_hashes, err)) {
+    return false;
+  }
+
+  DelegationRevocationStatus revocation_status;
+  if (!ReadDelegationRevocationStatusJson(
+          delegation_dir / "delegation_revocation_status.json",
+          &revocation_status, err)) {
+    if (err != nullptr) *err = "failed to read delegation revocation status: " + *err;
+    return false;
+  }
+  if (!VerifyDelegationRevocationStatus(
+          revocation_status, holder.device_pkx_hex, holder.device_pky_hex,
+          del_msg, request.now_iso8601, err)) {
+    if (err != nullptr) *err = "delegation revocation check failed: " + *err;
+    return false;
+  }
+
+  std::vector<uint8_t> del_sig_bytes;
+  if (!HexToBytes(del_sig, &del_sig_bytes, err)) {
+    return false;
+  }
+  std::vector<uint8_t> revocation_sig_bytes;
+  if (!HexToBytes(revocation_status.sig_hex, &revocation_sig_bytes, err)) {
+    return false;
+  }
+  std::vector<uint8_t> revocation_id_bytes;
+  if (!HexToBytes(revocation_status.delegation_id_hex, &revocation_id_bytes,
+                  err)) {
+    return false;
+  }
+  const std::vector<uint8_t> revocation_epoch_be =
+      Uint64Be(revocation_status.epoch);
+
+  std::vector<uint8_t> agent_digest;
+  if (!ComputeDeviceAuthenticationDigest(request.transcript_bytes,
+                                         request.doc_type, &agent_digest,
+                                         err)) {
+    return false;
+  }
+  std::vector<uint8_t> agent_sig_bytes;
+  if (!SignSha256DigestP256(agent_sk, agent_digest, &agent_sig_bytes, err)) {
+    return false;
   }
 
   // 6. 生成包含约束⑦-⑪的 ZK 证明

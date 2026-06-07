@@ -148,8 +148,8 @@ bool RunDelegateCommand(const std::filesystem::path& holder_dir,
     return false;
   }
 
-  // Step 7b: 生成国密 profile 材料。上面的 P-256/SHA-256 委托材料保留
-  // 给 baseline profile；SM request 会读取下面这些 SM2/SM3 文件。
+  // Step 7b: 生成国密 profile 材料。默认业务 request 会读取这些 SM2/SM3
+  // 文件；上面的 P-256/SHA-256 委托材料仅保留给显式 legacy 回归路径。
   std::string device_pkx_sm2, device_pky_sm2, agent_pkx_sm2, agent_pky_sm2;
   if (!DeriveSM2PublicKey(holder.device_sk_hex, &device_pkx_sm2,
                           &device_pky_sm2, err) ||

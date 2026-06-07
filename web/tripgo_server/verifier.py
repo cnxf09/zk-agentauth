@@ -47,7 +47,7 @@ def _run(cmd: List[str], on_line: Optional[Callable[[str], None]] = None) -> str
 def request(issuer_public: Path, claims: List[str], out_dir: Path,
             predicates: Optional[List[str]] = None,
             on_line: Optional[Callable[[str], None]] = None) -> str:
-    """Issue a reader request. Optional `predicates` map to `--predicate`."""
+    """Issue an SM2/SM3 reader request. Optional predicates map to --predicate."""
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = [str(_bin("delegation_demo_verifier")), "request",
            "--issuer-public", str(issuer_public),
