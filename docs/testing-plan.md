@@ -57,7 +57,7 @@ present -> verify
 
 使用 `scripts/security_cli.sh` 检查高价值负例：
 
-- 合法 baseline proof 应被接受。
+- 合法 SM2/SM3 proof 应被接受。
 - 已撤销委托应被拒绝。
 - 已过期策略应被拒绝。
 - 不满足谓词的请求应被拒绝。

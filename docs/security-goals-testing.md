@@ -12,8 +12,8 @@ scripts/security_goals_cli.sh
 
 ```text
 result,goal,test
-PASS,baseline,valid_agent_presentation_generated
-PASS,baseline,valid_agent_presentation_accepted
+PASS,sm_default,valid_agent_presentation_generated
+PASS,sm_default,valid_agent_presentation_accepted
 PASS,unforgeability,tampered_delegation_signature_cannot_present
 PASS,unforgeability,wrong_agent_secret_cannot_present
 PASS,delegation_transparency,verifier_reports_authorized_agent_checks
@@ -49,7 +49,7 @@ PASS,delegator_anonymity,presentation_omits_hidden_witness_material
 
 测试方式：
 
-- 在合法 delegation 中篡改 `delegation_sig.txt`。
+- 在合法 delegation 中篡改默认链路使用的 `delegation_sig_sm2.txt`。
 - 在合法 delegation 中篡改 `agent_sk.txt`，模拟非被授权 Agent 尝试操作。
 
 预期：

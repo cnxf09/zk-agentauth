@@ -148,12 +148,12 @@ booking_status / presentation_log`。对宿主说「用出行助手帮我订外�
 # 替换 Wallet/Agent 本地委托签名字节，证明无效委托无法生成有效 proof
 python3 -c "
 from pathlib import Path
-for f in Path('data/wallet/tasks').glob('*/delegation/delegation_sig.txt'):
+for f in Path('data/wallet/tasks').glob('*/delegation/delegation_sig_sm2.txt'):
     s = f.read_text()
     f.write_text(s[:5] + ('a' if s[5]!='a' else 'b') + s[6:])
     print('tampered:', f); break
 "
-# 对被篡改的 delegation 重新 present 会失败；presentation zip 不再发送 delegation_sig 明文。
+# 对被篡改的 delegation 重新 present 会失败；presentation zip 不再发送 delegation_sig_sm2 明文。
 ```
 
 ## API 速查

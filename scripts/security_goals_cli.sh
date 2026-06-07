@@ -94,15 +94,15 @@ PY
 
 printf "result,goal,test\n"
 
-BASE="$WORK/baseline"
+BASE="$WORK/sm_default"
 setup_valid "$BASE"
-expect_ok "baseline" "valid_agent_presentation_generated" \
+expect_ok "sm_default" "valid_agent_presentation_generated" \
   "$BIN/delegation_demo_agent" present \
     --delegation "$BASE/delegation" \
     --issuer-public "$BASE/issue/issuer_public" \
     --request "$BASE/request" \
     --out "$BASE/presentation"
-expect_ok "baseline" "valid_agent_presentation_accepted" \
+expect_ok "sm_default" "valid_agent_presentation_accepted" \
   "$BIN/delegation_demo_verifier" verify \
     --issuer-public "$BASE/issue/issuer_public" \
     --request "$BASE/request" \
@@ -110,7 +110,7 @@ expect_ok "baseline" "valid_agent_presentation_accepted" \
 
 FORGED_DELEGATION="$WORK/forged_delegation_sig"
 cp -a "$BASE" "$FORGED_DELEGATION"
-flip_hex_file_first_digit "$FORGED_DELEGATION/delegation/delegation_sig.txt"
+flip_hex_file_first_digit "$FORGED_DELEGATION/delegation/delegation_sig_sm2.txt"
 expect_fail "unforgeability" "tampered_delegation_signature_cannot_present" \
   "$BIN/delegation_demo_agent" present \
     --delegation "$FORGED_DELEGATION/delegation" \
