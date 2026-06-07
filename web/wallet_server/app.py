@@ -523,6 +523,37 @@ def index():
     return send_from_directory(STATIC_DIR, "index.html")
 
 
+@app.route("/manage")
+def manage():
+    # Standalone local credential/permission management console (companion to the
+    # MCP server). Served on the same port as the demo; the demo at / is untouched.
+    return send_from_directory(STATIC_DIR, "manage.html")
+
+
+@app.route("/api/mcp/info")
+def mcp_info():
+    """Info for the management console's "MCP 接入" panel to render a copy-paste
+    host config. Read-only, local."""
+    venv_python = ROOT / ".venv" / "bin" / "python"
+    server_path = ROOT / "mcp_server" / "server.py"
+    return jsonify({
+        "repo_root": str(ROOT.parent),
+        "python_path": str(venv_python),
+        "server_path": str(server_path),
+        "wallet_base": f"{DEFAULT_SCHEME}://localhost:{PORT}",
+        "tripgo_base": TRIPGO_BASE,
+        "server_name": "zkaa-wallet",
+        "tools": [
+            {"name": "list_agents", "desc": "列出所有委托 Agent 及其授权属性"},
+            {"name": "list_hotels", "desc": "列出可预订的酒店目录"},
+            {"name": "wallet_status", "desc": "查询是否持有凭证及可证明属性"},
+            {"name": "book_hotel", "desc": "以某 Agent 身份匿名 ZK 证明预订酒店"},
+            {"name": "booking_status", "desc": "查询某次预订任务状态"},
+            {"name": "presentation_log", "desc": "读取真实出示历史"},
+        ],
+    })
+
+
 @app.route("/<path:fname>")
 def static_files(fname):
     return send_from_directory(STATIC_DIR, fname)

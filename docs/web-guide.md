@@ -82,6 +82,66 @@ make demo         # 等价 ./start.sh
 3. 顶部 chip 行多出新委托，可点击切换为下次派单生效的策略
 4. 取消勾选某属性（如 `age_over_18`），再去对话框预订 18+ 酒店 → TripGo 端 Business Rule 检查 FAIL → 订单 REJECT
 
+## 接入其他 AI Agent（MCP 服务）
+
+把本项目的「匿名委托下单」能力作为一个 **MCP 服务(stdio)** 暴露,任何支持 MCP 的 Agent
+宿主(Claude Desktop / Hermes / openclaw / …)加一段配置即可复用,宿主侧零代码改动。MCP
+server 是对运行中的 `wallet_server`(:8002)的薄代理,自身不做密码学。详见
+[`mcp-server.md`](mcp-server.md)。
+
+**前置**:先 `make demo` 起 wallet + tripgo 并保持运行(下单要 TripGo 在线)。
+
+### 配置方法 A · 标准 `mcpServers` JSON（Claude Desktop 等）
+
+写进宿主的 MCP 配置(如 `claude_desktop_config.json`);把路径换成你的仓库绝对路径:
+
+```json
+{
+  "mcpServers": {
+    "zkaa-wallet": {
+      "command": "/ABS/PATH/zk-agentauth/web/.venv/bin/python",
+      "args": ["/ABS/PATH/zk-agentauth/web/mcp_server/server.py"],
+      "env": { "WALLET_BASE": "http://localhost:8002" }
+    }
+  }
+}
+```
+
+### 配置方法 B · Hermes（YAML,字段是 `mcp_servers`）
+
+写进 `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  zkaa-wallet:
+    command: /ABS/PATH/zk-agentauth/web/.venv/bin/python
+    args:
+    - /ABS/PATH/zk-agentauth/web/mcp_server/server.py
+    env:
+      WALLET_BASE: http://localhost:8002
+    timeout: 600
+```
+
+重启宿主后,工具列表出现 `list_agents / list_hotels / wallet_status / book_hotel /
+booking_status / presentation_log`。对宿主说「用出行助手帮我订外滩璞丽酒店」即走真实
+零知识证明下单。
+
+> 配置片段也可在管理台「MCP 接入」页一键复制(路径已自动填好)。
+> 调试:`make mcp-dev` 打开 MCP Inspector 交互式调用各工具。
+> TripGo 上云:只在 wallet 侧设 `TRIPGO_BASE=https://你的域名`,宿主配置不用改。
+
+### 本地权限/凭证管理台
+
+外部 Agent 宿主无法管理委托权限与凭证,因此提供一个本地管理台(与 demo 同端口,无新进程):
+
+打开 **http://localhost:8002/manage**,可:
+- **档案**:增删改多个 Agent,为每个 Agent 勾选可披露的属性(`allowed_claims`)。
+  这是唯一的授权点——MCP 的 `book_hotel` 只能按所选 Agent 的授权出示,无法越权。
+- **凭证**:查看 mDoc 持有的属性,重发凭证。
+- **委托管理**:撤销委托(consume-on-use)。
+- **日志**:真实出示历史(含外部 Agent 经 MCP 触发的)。
+- **MCP 接入**:复制上面的配置片段、查看工具清单与在线自检。
+
 ## 篡改演示（验证安全性）
 
 ```bash
@@ -339,11 +399,16 @@ ZKAA_TLS_VERIFY=0
 web/
 ├── README.md
 ├── Makefile · start.sh · requirements.txt
+├── mcp_server/
+│   ├── server.py          # MCP 服务（stdio，薄代理到 wallet:8002）
+│   └── README.md          # MCP 工具清单与接入说明
 ├── wallet_server/
-│   ├── app.py             # Flask routes + bootstrap
+│   ├── app.py             # Flask routes + bootstrap（含 /manage、/api/mcp/info）
 │   ├── bins.py            # subprocess 包装四个 C++ 二进制
-│   ├── agent_runner.py    # 五阶段任务 + SSE
-│   └── static/index.html  # Client UI（单文件 React）
+│   ├── agent_runner.py    # 五阶段任务 + SSE + 持久化日志
+│   └── static/
+│       ├── index.html     # Client UI（单文件 React,带聊天的 web demo）
+│       └── manage.html    # 本地权限/凭证管理台（/manage）
 ├── tripgo_server/
 │   ├── app.py             # Flask routes
 │   ├── verifier.py        # subprocess 包装 verifier
