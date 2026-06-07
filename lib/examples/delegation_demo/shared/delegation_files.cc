@@ -312,6 +312,121 @@ bool ReadDelegationDir(const std::filesystem::path& dir,
   return true;
 }
 
+bool WriteDelegationSmDir(const std::filesystem::path& dir,
+                          const HolderMdoc& holder,
+                          const std::string& agent_sk_hex,
+                          const std::string& device_pkx_sm2,
+                          const std::string& device_pky_sm2,
+                          const std::string& agent_pkx_sm2,
+                          const std::string& agent_pky_sm2,
+                          const std::string& del_msg_sm3,
+                          const std::string& del_sig_sm2,
+                          const DelegationRevocationStatus& rev_sm2,
+                          const Policy& policy,
+                          const std::vector<ReaderClaim>& allowed_claims,
+                          std::string* err) {
+  if (!EnsureDir(dir, err)) return false;
+
+  if (!WriteStringFile(dir / "device_sk.txt", holder.device_sk_hex, err) ||
+      !WriteStringFile(dir / "device_pkx.txt", holder.device_pkx_hex, err) ||
+      !WriteStringFile(dir / "device_pky.txt", holder.device_pky_hex, err) ||
+      !WriteStringFile(dir / "doc_type.txt", holder.doc_type, err) ||
+      !WriteBytesFile(dir / "device_response.cbor",
+                      holder.device_response_cbor, err)) {
+    return false;
+  }
+
+  if (!WriteStringFile(dir / "crypto_profile.txt", kHybridCryptoProfile, err) ||
+      !WriteStringFile(dir / "agent_sk.txt", agent_sk_hex, err) ||
+      !WriteStringFile(dir / "device_pkx_sm2.txt", device_pkx_sm2, err) ||
+      !WriteStringFile(dir / "device_pky_sm2.txt", device_pky_sm2, err) ||
+      !WriteStringFile(dir / "agent_pkx_sm2.txt", agent_pkx_sm2, err) ||
+      !WriteStringFile(dir / "agent_pky_sm2.txt", agent_pky_sm2, err) ||
+      !WriteStringFile(dir / "delegation_msg_sm3.txt", del_msg_sm3, err) ||
+      !WriteStringFile(dir / "delegation_sig_sm2.txt", del_sig_sm2, err)) {
+    return false;
+  }
+
+  if (!WriteDelegationRevocationStatusJson(
+          dir / "delegation_revocation_status_sm2.json", rev_sm2, err) ||
+      !WritePolicyJson(dir / "policy.json", policy, err) ||
+      !WriteStringFile(dir / "allowed_claims_count.txt",
+                       std::to_string(allowed_claims.size()), err)) {
+    return false;
+  }
+  for (size_t i = 0; i < allowed_claims.size(); ++i) {
+    const auto& c = allowed_claims[i];
+    const std::string idx = std::to_string(i);
+    if (!WriteStringFile(dir / ("allowed_alias_" + idx + ".txt"), c.alias,
+                         err) ||
+        !WriteStringFile(dir / ("allowed_namespace_" + idx + ".txt"),
+                         c.namespace_id, err) ||
+        !WriteStringFile(dir / ("allowed_id_" + idx + ".txt"), c.element_id,
+                         err) ||
+        !WriteBytesFile(dir / ("allowed_cbor_value_" + idx + ".bin"),
+                        c.cbor_value, err)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool ReadDelegationSmDir(const std::filesystem::path& dir,
+                         HolderMdoc* holder,
+                         std::string* agent_sk_hex,
+                         std::string* device_pkx_sm2,
+                         std::string* device_pky_sm2,
+                         std::string* agent_pkx_sm2,
+                         std::string* agent_pky_sm2,
+                         std::string* del_msg_sm3,
+                         std::string* del_sig_sm2,
+                         DelegationRevocationStatus* rev_sm2,
+                         Policy* policy,
+                         std::string* err) {
+  if (!ReadStringFile(dir / "device_sk.txt", &holder->device_sk_hex, err) ||
+      !ReadStringFile(dir / "device_pkx.txt", &holder->device_pkx_hex, err) ||
+      !ReadStringFile(dir / "device_pky.txt", &holder->device_pky_hex, err) ||
+      !ReadStringFile(dir / "doc_type.txt", &holder->doc_type, err) ||
+      !ReadBytesFile(dir / "device_response.cbor",
+                     &holder->device_response_cbor, err) ||
+      !ReadStringFile(dir / "agent_sk.txt", agent_sk_hex, err) ||
+      !ReadStringFile(dir / "device_pkx_sm2.txt", device_pkx_sm2, err) ||
+      !ReadStringFile(dir / "device_pky_sm2.txt", device_pky_sm2, err) ||
+      !ReadStringFile(dir / "agent_pkx_sm2.txt", agent_pkx_sm2, err) ||
+      !ReadStringFile(dir / "agent_pky_sm2.txt", agent_pky_sm2, err) ||
+      !ReadStringFile(dir / "delegation_msg_sm3.txt", del_msg_sm3, err) ||
+      !ReadStringFile(dir / "delegation_sig_sm2.txt", del_sig_sm2, err)) {
+    return false;
+  }
+  if (!ReadDelegationRevocationStatusJson(
+          dir / "delegation_revocation_status_sm2.json", rev_sm2, err) ||
+      !ReadPolicyJson(dir / "policy.json", policy, err)) {
+    return false;
+  }
+
+  std::string count_str;
+  if (!ReadStringFile(dir / "allowed_claims_count.txt", &count_str, err)) {
+    return false;
+  }
+  const size_t count = static_cast<size_t>(std::stoul(count_str));
+  holder->issued_claims.resize(count);
+  for (size_t i = 0; i < count; ++i) {
+    const std::string idx = std::to_string(i);
+    auto& c = holder->issued_claims[i];
+    if (!ReadStringFile(dir / ("allowed_alias_" + idx + ".txt"), &c.alias,
+                        err) ||
+        !ReadStringFile(dir / ("allowed_namespace_" + idx + ".txt"),
+                        &c.namespace_id, err) ||
+        !ReadStringFile(dir / ("allowed_id_" + idx + ".txt"), &c.element_id,
+                        err) ||
+        !ReadBytesFile(dir / ("allowed_cbor_value_" + idx + ".bin"),
+                       &c.cbor_value, err)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // ----------------------------------------------------------------
 // public_delegation.json 读写
 // ----------------------------------------------------------------

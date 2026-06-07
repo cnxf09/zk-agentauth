@@ -215,11 +215,11 @@ def _run(task: Task, holder_dir: Path, issuer_public_dir: Path,
             revoked=revoked,
         )
         policy = json.loads((delegation_dir / "policy.json").read_text())
-        agent_pkx = (delegation_dir / "agent_pkx.txt").read_text().strip()
+        agent_pkx = (delegation_dir / "agent_pkx_sm2.txt").read_text().strip()
         task.emit("delegated",
                   policy=policy,
                   agent_pkx=agent_pkx[:34] + "...",
-                  delegation_msg=(delegation_dir / "delegation_msg.txt").read_text().strip()[:42] + "...")
+                  delegation_msg=(delegation_dir / "delegation_msg_sm3.txt").read_text().strip()[:42] + "...")
 
         # ── 2. Fetch OID4VP request from TripGo ─────────────────
         # Predicates must round-trip to the verifier so the reader request

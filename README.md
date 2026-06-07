@@ -9,8 +9,8 @@ agent / verifier 四个 CLI)+ **Python 编排层**(`web/`,Flask 双服务 + MCP 
 方式使用:可视化 Web 演示、接入任意支持 MCP 的 AI Agent、或直接调命令行。
 
 当前国密 profile 为 `zk-agentauth-sm-delegation-v1`:委托、Agent 会话和委托撤销签名使用
-标准 SM2,SM2 的 `ZA/e` 以及委托策略相关摘要使用 SM3。mDoc issuer 签名、原始 baseline
-路径、circuit id 等非委托签名路径仍保留 P-256/SHA-256 兼容逻辑。
+标准 SM2,SM2 的 `ZA/e` 以及委托策略相关摘要使用 SM3。mDoc issuer 签名、circuit id
+等非委托签名路径仍保留原有 P-256/SHA-256 兼容逻辑。
 
 ## 构建
 

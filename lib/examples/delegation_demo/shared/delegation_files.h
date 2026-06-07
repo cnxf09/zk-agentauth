@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "examples/delegation_demo/shared/types.h"
+#include "examples/delegation_demo/shared/delegation_revocation.h"
 #include "examples/mdoc_anoncred/shared/types.h"
 
 namespace proofs {
@@ -53,6 +54,34 @@ bool ReadDelegationDir(const std::filesystem::path& dir,
                        std::string* del_sig_hex,
                        Policy* policy,
                        std::string* err);
+
+// SM2/SM3-only delegation directory used by the default business flow.
+bool WriteDelegationSmDir(const std::filesystem::path& dir,
+                          const HolderMdoc& holder,
+                          const std::string& agent_sk_hex,
+                          const std::string& device_pkx_sm2,
+                          const std::string& device_pky_sm2,
+                          const std::string& agent_pkx_sm2,
+                          const std::string& agent_pky_sm2,
+                          const std::string& del_msg_sm3,
+                          const std::string& del_sig_sm2,
+                          const DelegationRevocationStatus& rev_sm2,
+                          const Policy& policy,
+                          const std::vector<ReaderClaim>& allowed_claims,
+                          std::string* err);
+
+bool ReadDelegationSmDir(const std::filesystem::path& dir,
+                         HolderMdoc* holder,
+                         std::string* agent_sk_hex,
+                         std::string* device_pkx_sm2,
+                         std::string* device_pky_sm2,
+                         std::string* agent_pkx_sm2,
+                         std::string* agent_pky_sm2,
+                         std::string* del_msg_sm3,
+                         std::string* del_sig_sm2,
+                         DelegationRevocationStatus* rev_sm2,
+                         Policy* policy,
+                         std::string* err);
 
 // ---- public_delegation.json 读写 ----
 // Module C 写出，Module D 读入。只包含 verifier 需要的公开输入；

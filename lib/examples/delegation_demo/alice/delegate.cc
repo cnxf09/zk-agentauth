@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <chrono>
 #include <ctime>
-#include <fstream>
 #include <iomanip>
 #include <sstream>
 
@@ -44,42 +43,6 @@ std::vector<ReaderClaim> FilterClaims(const std::vector<ReaderClaim>& all_claims
   return result;
 }
 
-bool WriteAppCryptoArtifacts(const std::filesystem::path& out_dir,
-                             const std::string& device_pkx_sm2,
-                             const std::string& device_pky_sm2,
-                             const std::string& agent_pkx_sm2,
-                             const std::string& agent_pky_sm2,
-                             const std::string& del_msg_sm3,
-                             const std::string& del_sig_sm2,
-                             const DelegationRevocationStatus& rev_sm2,
-                             std::string* err) {
-  auto write_string = [&](const std::filesystem::path& path,
-                          const std::string& value) -> bool {
-    std::ofstream out(path, std::ios::trunc);
-    if (!out) {
-      if (err != nullptr) *err = "failed to open: " + path.string();
-      return false;
-    }
-    out << value << "\n";
-    return out.good();
-  };
-
-  if (!write_string(out_dir / "crypto_profile.txt", kHybridCryptoProfile) ||
-      !write_string(out_dir / "device_pkx_sm2.txt", device_pkx_sm2) ||
-      !write_string(out_dir / "device_pky_sm2.txt", device_pky_sm2) ||
-      !write_string(out_dir / "agent_pkx_sm2.txt", agent_pkx_sm2) ||
-      !write_string(out_dir / "agent_pky_sm2.txt", agent_pky_sm2) ||
-      !write_string(out_dir / "delegation_msg_sm3.txt", del_msg_sm3) ||
-      !write_string(out_dir / "delegation_sig_sm2.txt", del_sig_sm2)) {
-    return false;
-  }
-  if (!WriteDelegationRevocationStatusJson(
-          out_dir / "delegation_revocation_status_sm2.json", rev_sm2, err)) {
-    return false;
-  }
-  return true;
-}
-
 }  // namespace
 
 bool RunDelegateCommand(const std::filesystem::path& holder_dir,
@@ -97,10 +60,10 @@ bool RunDelegateCommand(const std::filesystem::path& holder_dir,
     return false;
   }
 
-  // Step 2: 生成 Agent 临时密钥对 (sk_ag, pk_ag)
-  std::string agent_sk_hex, agent_pkx_hex, agent_pky_hex;
-  if (!GenerateP256KeyPair(&agent_sk_hex, &agent_pkx_hex, &agent_pky_hex, err)) {
-    if (err != nullptr) *err = "failed to generate agent key pair: " + *err;
+  // Step 2: 生成 Agent SM2 临时密钥对 (sk_ag, pk_ag)
+  std::string agent_sk_hex, agent_pkx_sm2, agent_pky_sm2;
+  if (!GenerateSM2KeyPair(&agent_sk_hex, &agent_pkx_sm2, &agent_pky_sm2, err)) {
+    if (err != nullptr) *err = "failed to generate SM2 agent key pair: " + *err;
     return false;
   }
 
@@ -112,49 +75,11 @@ bool RunDelegateCommand(const std::filesystem::path& holder_dir,
   policy.agent_id = agent_id;
   policy.created = CurrentTimeISO8601();
 
-  // Step 4: 计算委托消息 del_msg = SHA256(pk_ag_x || pk_ag_y || canonical_policy)
-  std::string del_msg_hex;
-  if (!ComputeDelegationMsg(agent_pkx_hex, agent_pky_hex, policy,
-                             &del_msg_hex, err)) {
-    if (err != nullptr) *err = "failed to compute delegation message: " + *err;
-    return false;
-  }
-
-  // Step 5: 用 Alice 的 device_sk 签名
-  std::string del_sig_hex;
-  if (!SignDelegation(holder.device_sk_hex, del_msg_hex, &del_sig_hex, err)) {
-    if (err != nullptr) *err = "failed to sign delegation: " + *err;
-    return false;
-  }
-
-  // Step 6 (自检): 验证签名是否正确
-  {
-    std::string verify_err;
-    if (!VerifyDelegationSig(holder.device_pkx_hex, holder.device_pky_hex,
-                              del_msg_hex, del_sig_hex, &verify_err)) {
-      if (err != nullptr) {
-        *err = "delegation signature self-check failed: " + verify_err;
-      }
-      return false;
-    }
-  }
-
-  // Step 7: Alice 对该委托的撤销状态签名，Verifier 后续据此判断委托是否仍有效
-  DelegationRevocationStatus revocation_status;
-  if (!CreateDelegationRevocationStatus(holder.device_sk_hex, del_msg_hex,
-                                        1, expires, revoked,
-                                        &revocation_status, err)) {
-    if (err != nullptr) *err = "failed to create revocation status: " + *err;
-    return false;
-  }
-
-  // Step 7b: 生成国密 profile 材料。默认业务 request 会读取这些 SM2/SM3
-  // 文件；上面的 P-256/SHA-256 委托材料仅保留给显式 legacy 回归路径。
-  std::string device_pkx_sm2, device_pky_sm2, agent_pkx_sm2, agent_pky_sm2;
+  // Step 4: 生成国密 profile 材料。
+  std::string device_pkx_sm2, device_pky_sm2;
   if (!DeriveSM2PublicKey(holder.device_sk_hex, &device_pkx_sm2,
-                          &device_pky_sm2, err) ||
-      !DeriveSM2PublicKey(agent_sk_hex, &agent_pkx_sm2, &agent_pky_sm2, err)) {
-    if (err != nullptr) *err = "failed to derive SM2 public keys: " + *err;
+                          &device_pky_sm2, err)) {
+    if (err != nullptr) *err = "failed to derive device SM2 public key: " + *err;
     return false;
   }
   std::string del_msg_sm3;
@@ -187,7 +112,7 @@ bool RunDelegateCommand(const std::filesystem::path& holder_dir,
     return false;
   }
 
-  // Step 8: 筛选允许的 claims
+  // Step 5: 筛选允许的 claims
   const std::vector<ReaderClaim> filtered = FilterClaims(holder.issued_claims, allowed_claims);
   if (filtered.empty() && !allowed_claims.empty()) {
     if (err != nullptr) {
@@ -196,24 +121,12 @@ bool RunDelegateCommand(const std::filesystem::path& holder_dir,
     return false;
   }
 
-  // Step 9: 写出 delegation/ 目录
-  if (!WriteDelegationDir(out_dir, holder,
-                           agent_pkx_hex, agent_pky_hex, agent_sk_hex,
-                           del_msg_hex, del_sig_hex,
-                           policy, filtered, err)) {
+  // Step 6: 写出 SM-only delegation/ 目录
+  if (!WriteDelegationSmDir(out_dir, holder, agent_sk_hex, device_pkx_sm2,
+                            device_pky_sm2, agent_pkx_sm2, agent_pky_sm2,
+                            del_msg_sm3, del_sig_sm2, revocation_status_sm2,
+                            policy, filtered, err)) {
     if (err != nullptr) *err = "failed to write delegation dir: " + *err;
-    return false;
-  }
-  if (!WriteDelegationRevocationStatusJson(
-          out_dir / "delegation_revocation_status.json",
-          revocation_status, err)) {
-    if (err != nullptr) *err = "failed to write revocation status: " + *err;
-    return false;
-  }
-  if (!WriteAppCryptoArtifacts(out_dir, device_pkx_sm2, device_pky_sm2,
-                               agent_pkx_sm2, agent_pky_sm2, del_msg_sm3,
-                               del_sig_sm2, revocation_status_sm2, err)) {
-    if (err != nullptr) *err = "failed to write SM2 app crypto artifacts: " + *err;
     return false;
   }
 
