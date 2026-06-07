@@ -23,38 +23,6 @@ bool ReadPolicyJson(const std::filesystem::path& path,
                     Policy* policy,
                     std::string* err);
 
-// ---- delegation/ 目录读写 ----
-
-// 将委托目录写出：包含凭证材料（holder）+ Agent 密钥 + 委托签名 + 策略
-// holder:         原始凭证（从 Alice 的 holder/ 目录读取）
-// agent_pkx/pky:  Agent 临时公钥 hex（含 0x 前缀）
-// agent_sk:       Agent 临时私钥 hex（含 0x 前缀）
-// del_msg_hex:    委托消息摘要 hex（含 0x 前缀）
-// del_sig_hex:    委托签名 hex（含 0x 前缀）
-// policy:         委托策略
-// allowed_claims: 筛选后的 claims（仅 policy 允许的）
-bool WriteDelegationDir(const std::filesystem::path& dir,
-                        const HolderMdoc& holder,
-                        const std::string& agent_pkx_hex,
-                        const std::string& agent_pky_hex,
-                        const std::string& agent_sk_hex,
-                        const std::string& del_msg_hex,
-                        const std::string& del_sig_hex,
-                        const Policy& policy,
-                        const std::vector<ReaderClaim>& allowed_claims,
-                        std::string* err);
-
-// 从委托目录读取所有材料
-bool ReadDelegationDir(const std::filesystem::path& dir,
-                       HolderMdoc* holder,
-                       std::string* agent_pkx_hex,
-                       std::string* agent_pky_hex,
-                       std::string* agent_sk_hex,
-                       std::string* del_msg_hex,
-                       std::string* del_sig_hex,
-                       Policy* policy,
-                       std::string* err);
-
 // SM2/SM3-only delegation directory used by the default business flow.
 bool WriteDelegationSmDir(const std::filesystem::path& dir,
                           const HolderMdoc& holder,

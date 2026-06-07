@@ -177,32 +177,6 @@ bool ComputeDelegationIdHexSm3(const std::string& delegation_msg_hex,
   return true;
 }
 
-bool CreateDelegationRevocationStatus(
-    const std::string& device_sk_hex,
-    const std::string& delegation_msg_hex,
-    uint64_t epoch,
-    const std::string& expires,
-    bool revoked,
-    DelegationRevocationStatus* status,
-    std::string* err) {
-  status->epoch = epoch;
-  status->expires = expires;
-  status->revoked = revoked;
-  if (!ComputeDelegationIdHex(delegation_msg_hex, &status->delegation_id_hex,
-                              err)) {
-    return false;
-  }
-
-  std::string digest_hex;
-  if (!ComputeStatusDigestHex(*status, false, &digest_hex, err)) {
-    return false;
-  }
-  if (!SignDelegation(device_sk_hex, digest_hex, &status->sig_hex, err)) {
-    return false;
-  }
-  return true;
-}
-
 bool CreateDelegationRevocationStatusSm2(
     const std::string& device_sk_hex,
     const std::string& delegation_msg_hex,
@@ -224,44 +198,6 @@ bool CreateDelegationRevocationStatusSm2(
     return false;
   }
   if (!SignDelegationSm2(device_sk_hex, digest_hex, &status->sig_hex, err)) {
-    return false;
-  }
-  return true;
-}
-
-bool VerifyDelegationRevocationStatus(
-    const DelegationRevocationStatus& status,
-    const std::string& device_pkx_hex,
-    const std::string& device_pky_hex,
-    const std::string& delegation_msg_hex,
-    const std::string& now_iso8601,
-    std::string* err) {
-  std::string expected_id;
-  if (!ComputeDelegationIdHex(delegation_msg_hex, &expected_id, err)) {
-    return false;
-  }
-  if (status.delegation_id_hex != expected_id) {
-    if (err != nullptr) *err = "delegation revocation status id mismatch";
-    return false;
-  }
-  std::string digest_hex;
-  if (!ComputeStatusDigestHex(status, false, &digest_hex, err)) {
-    return false;
-  }
-  if (!VerifyDelegationSig(device_pkx_hex, device_pky_hex, digest_hex,
-                           status.sig_hex, err)) {
-    if (err != nullptr) *err = "revocation status signature invalid: " + *err;
-    return false;
-  }
-  if (status.revoked) {
-    if (err != nullptr) *err = "delegation is revoked";
-    return false;
-  }
-  if (status.expires <= now_iso8601) {
-    if (err != nullptr) {
-      *err = "revocation status expired (expires=" + status.expires +
-             ", now=" + now_iso8601 + ")";
-    }
     return false;
   }
   return true;

@@ -7,13 +7,6 @@
 
 namespace proofs {
 
-// D-1: 生成验证请求（包装已有 RunMdocRequestCommand）
-bool RunDelegationRequestCommand(
-    const std::filesystem::path& issuer_public_dir,
-    const std::vector<std::string>& claim_aliases,
-    const std::filesystem::path& out_dir,
-    std::string* err);
-
 bool RunDelegationSmRequestCommand(
     const std::filesystem::path& issuer_public_dir,
     const std::vector<std::string>& claim_aliases,
