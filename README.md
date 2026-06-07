@@ -103,8 +103,7 @@ $BIN/delegation_demo_verifier verify --issuer-public $WORK/issue/issuer_public \
 
 预期 6 项检查全 PASS、`Overall: ACCEPT`。example 3 自带 4 个 claim(age_over_18 /
 family_name / birth_date / height);谓词支持 `DISCLOSE / EQ / IN_SET / GE / LE`,
-当前 ZK 规格单次最多组合 2 个 claim。业务默认使用 SM2/SM3 delegated profile;如需临时
-回归旧路径,可显式传 `request --legacy-p256`。
+当前 ZK 规格单次最多组合 2 个 claim。业务默认并固定使用 SM2/SM3 delegated profile。
 
 ## 致谢
 

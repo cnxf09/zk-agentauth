@@ -75,6 +75,7 @@ scripts/security_cli.sh
 
 ```text
 result,test
+PASS,legacy_profile_flag_rejected
 PASS,sm_present
 PASS,sm_verify
 PASS,revoked_delegation_rejected

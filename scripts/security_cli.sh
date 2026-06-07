@@ -86,6 +86,11 @@ printf "result,test\n"
 
 BASE="$WORK/sm_default"
 setup_base "$BASE"
+expect_fail legacy_profile_flag_rejected "$BIN/delegation_demo_verifier" request \
+  --legacy-p256 \
+  --issuer-public "$BASE/issue/issuer_public" \
+  --claim age_over_18 \
+  --out "$BASE/legacy_request"
 expect_ok sm_present "$BIN/delegation_demo_agent" present \
   --delegation "$BASE/delegation" \
   --issuer-public "$BASE/issue/issuer_public" \
