@@ -971,6 +971,7 @@ const ICON_PATHS = {
   list:     <path d="M4 7h16M4 12h16M4 17h10" />,
   settings: <React.Fragment><circle cx="12" cy="12" r="3.2" /><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></React.Fragment>,
   chat:     <path d="M20.5 14.5a2 2 0 0 1-2 2H8l-4 4V5.5a2 2 0 0 1 2-2h12.5a2 2 0 0 1 2 2z" />,
+  persona:  <React.Fragment><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="0.9" /><circle cx="15" cy="10" r="0.9" /><path d="M8.5 14.5c1 1.2 2.1 1.8 3.5 1.8s2.5-.6 3.5-1.8" /></React.Fragment>,
 };
 function Icon({ name, size = 18, color = 'currentColor', strokeWidth = 2 }) {
   return (
@@ -1633,14 +1634,14 @@ function Section({ title, hint, children }) {
   return (
     <div style={{
       background: c.card, border: '0.5px solid ' + c.border,
-      borderRadius: 16, padding: ds.sp.l, boxShadow: c.shadowMd, overflow: 'hidden',
+      borderRadius: 16, padding: ds.sp.l, boxShadow: c.shadowMd,
     }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: ds.sp.m, gap: ds.sp.m }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: ds.sp.m, gap: ds.sp.m, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
           <span style={{ width: 4, height: 16, borderRadius: 3, background: c.accentGrad, flexShrink: 0 }} />
           <div style={{ fontSize: ds.fs.l, fontWeight: 700, color: c.text }}>{title}</div>
         </div>
-        {hint && <div style={{ fontSize: ds.fs.s, color: c.textFaint, textAlign: 'right' }}>{hint}</div>}
+        {hint && <div style={{ fontSize: ds.fs.s, color: c.textFaint, textAlign: 'right', minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>{hint}</div>}
       </div>
       {children}
     </div>
@@ -3065,7 +3066,7 @@ function ChatView({ agent, model, setModel, messages, setMessages, onDispatch, g
 
   const suggestions = [
     { icon: '🏨', text: '帮我订外滩璞丽酒店' },
-    ...(allowed.includes('age_over_18') ? [{ icon: '🔞', text: '订一间 18+ 酒店' }] : []),
+    { icon: '🔞', text: '订一间 18+ 酒店' },
     { icon: '🔐', text: '你能为我证明哪些属性?' },
   ];
 
@@ -3253,6 +3254,96 @@ function ModelPanel({ model, setModel }) {
         <div style={{ marginTop: ds.sp.xl, fontSize: 12, color: c.textFaint, lineHeight: 1.7 }}>
           Key 仅保存在服务端 data/wallet/llm_config.json,不会回传浏览器。
           也可用环境变量 LLM_API_KEY / LLM_API_BASE / LLM_MODEL / LLM_PROVIDER 预置。
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ Persona (人格): preset / custom system-prompt addendum ═══════
+const PERSONA_PRESETS = [
+  { name: '大胆尝试', desc: '先行动后汇报:用户要求预订就直接尝试,被商家拒绝后如实反馈原因,绝不在尝试前自行拒绝。',
+    prompt: '行动优先:只要用户要求预订,立刻调用 book_hotel 尝试,不要因为担心授权不足而提前拒绝或反复确认。商家验证返回后,用一两句话如实转达成功或被拒及原因。' },
+  { name: '谨慎合规', desc: '行动前核对授权:可能不满足商家要求时,先提醒用户并征得同意再尝试。',
+    prompt: '谨慎行事:调用 book_hotel 前,先对比酒店要求与本 Agent 的授权属性;若可能不满足(如 18+ 酒店但未授权 age_over_18),先向用户说明风险并询问是否仍要尝试,用户确认后再调用工具。' },
+  { name: '简洁高效', desc: '回复尽量简短,只说关键信息,不解释原理。',
+    prompt: '回复风格:每次回复不超过两句话,只给结论和必要信息,不主动解释零知识证明原理,除非用户问。预订请求直接尝试。' },
+];
+
+function PersonaPanel() {
+  const ds = useDS(); const c = colors(ds);
+  const [name, setName] = React.useState('默认');
+  const [prompt, setPrompt] = React.useState('');
+  const [status, setStatus] = React.useState('');
+
+  React.useEffect(() => {
+    fetch('/api/persona').then((r) => r.json()).then((d) => {
+      setName(d.name || '默认'); setPrompt(d.prompt || '');
+    }).catch(() => {});
+  }, []);
+
+  const save = async (n, p) => {
+    setStatus('saving');
+    try {
+      const r = await fetch('/api/persona', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: n, prompt: p }),
+      });
+      const d = await r.json();
+      setName(d.name); setPrompt(d.prompt);
+      setStatus('saved'); setTimeout(() => setStatus(''), 1500);
+    } catch (e) { setStatus('error'); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <PageHeader title="人格" subtitle="预设系统提示词,决定 Agent 的行事风格(对所有 Agent 生效)" />
+      <div style={{ flex: 1, overflow: 'auto', padding: `${ds.sp.l}px ${ds.sp.xl}px`, maxWidth: 720 }}>
+        <div style={{ fontSize: ds.fs.s, color: c.textSub, marginBottom: 10 }}>预设人格(点击直接应用)</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: ds.sp.xl }}>
+          {PERSONA_PRESETS.map((p) => {
+            const active = name === p.name;
+            return (
+              <button key={p.name} className="zkaa-card" onClick={() => save(p.name, p.prompt)} style={{
+                appearance: 'none', font: 'inherit', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', borderRadius: 14,
+                border: '0.5px solid ' + (active ? c.accent : c.border),
+                background: active ? c.accentSoft : c.card, color: c.text, boxShadow: c.shadow,
+              }}>
+                <span style={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+                  border: '1.5px solid ' + (active ? c.accent : c.border),
+                  background: active ? c.accent : 'transparent', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
+                }}>{active ? '✓' : ''}</span>
+                <span style={{ flex: 1 }}>
+                  <div style={{ fontSize: ds.fs.m, fontWeight: 700 }}>{p.name}</div>
+                  <div style={{ fontSize: ds.fs.s, color: c.textSub, marginTop: 3, lineHeight: 1.6 }}>{p.desc}</div>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: ds.fs.s, color: c.textSub, marginBottom: 8 }}>
+          自定义提示词(当前人格: <b style={{ color: c.text }}>{name}</b>;编辑后点保存即生效)
+        </div>
+        <textarea className="zkaa-input" value={prompt} onChange={(e) => setPrompt(e.target.value)}
+          placeholder="例如:行动优先,用户要求预订就直接尝试…(留空 = 仅用系统默认行为)"
+          rows={6}
+          style={{
+            width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: 10, resize: 'vertical',
+            border: '0.5px solid ' + c.border, background: c.card, color: c.text,
+            font: 'inherit', fontSize: ds.fs.m, lineHeight: 1.7, outline: 'none',
+          }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: ds.sp.m }}>
+          <Btn kind="primary" onClick={() => save('自定义', prompt)}>保存为自定义人格</Btn>
+          <Btn kind="ghost" onClick={() => save('默认', '')}>恢复默认</Btn>
+          {status === 'saved' && <span style={{ color: c.success, fontSize: ds.fs.s }}>✓ 已生效</span>}
+          {status === 'error' && <span style={{ color: c.danger, fontSize: ds.fs.s }}>保存失败</span>}
+        </div>
+        <div style={{ marginTop: ds.sp.xl, fontSize: ds.fs.xs, color: c.textFaint, lineHeight: 1.8 }}>
+          人格只影响 Agent 的语气与行事策略(如是否先尝试再汇报)。可披露的属性始终由各档案的
+          授权列表在密码学层钳制,任何人格都无法越权披露。
         </div>
       </div>
     </div>
@@ -3677,6 +3768,7 @@ function Sidebar({ route, setRoute }) {
     { id: 'dels', label: '委托管理', icon: 'shield' },
     { id: 'wallet', label: '凭证钱包', icon: 'wallet' },
     { id: 'model', label: '模型', icon: 'cpu' },
+    { id: 'persona', label: '人格', icon: 'persona' },
     { id: 'logs', label: '日志', icon: 'list' },
     { id: 'settings', label: '设置', icon: 'settings' },
   ];
@@ -3737,6 +3829,34 @@ function Sidebar({ route, setRoute }) {
   );
 }
 
+// Turn a finished dispatch task (GET /api/agent/task/<id>) into a chat reply.
+function dispatchResultText(d, hotelName) {
+  if (d.status === 'failed') {
+    let err = '';
+    (d.events || []).forEach((e) => { if (e.phase === 'failed' && e.data) err = e.data.error || err; });
+    return '⚠️ 预订未完成:' + (err || '证明或下单失败(常见原因:TripGo 商家未在线)。');
+  }
+  const res = d.result || {};
+  const checks = res.checks || {};
+  const order = res.order || {};
+  if (res.accepted) {
+    const claims = (order.claims_proven || []).join('、');
+    const amount = order.amount != null ? ' · ¥' + order.amount : '';
+    return '✅ 预订成功!「' + (order.hotel_name || hotelName || '酒店') + '」 · 订单号 ' +
+      (order.order_id || '—') + amount + '。已通过零知识证明' +
+      (claims ? ',仅向商家披露 ' + claims : '') + ',商家无法回溯你的真实身份。';
+  }
+  let reason = '';
+  if (checks.business_rule && checks.business_rule !== 'PASS') {
+    reason = checks.business_rule;
+  } else {
+    const bad = Object.keys(checks).filter((k) => k !== 'overall' && k !== 'raw'
+      && typeof checks[k] === 'string' && /fail/i.test(checks[k]));
+    if (bad.length) reason = bad.join('、') + ' 未通过';
+  }
+  return '❌ 预订被商家拒绝(' + (checks.overall || 'REJECT') + ')' + (reason ? ':' + reason : '') + '。';
+}
+
 function App() {
   const [t, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
   const [route, setRoute] = React.useState('profiles');
@@ -3750,7 +3870,25 @@ function App() {
 
   const ctxTheme = { accent: t.accent, dark: t.dark, zkLevel: t.zkLevel };
   const openDel = (id) => setRoute('del:' + id);
-  const handleDispatch = (taskId, hotelName) => setDispatchOverlay({ taskId, hotelName });
+  const handleDispatch = (taskId, hotelName) => {
+    setDispatchOverlay({ taskId, hotelName });
+    // Poll the task to completion and append a result message to the chat of the
+    // Agent that started it — so feedback shows even if the overlay is closed.
+    const agentId = activeAgent && activeAgent.id;
+    if (!agentId) return;
+    let tries = 0;
+    const poll = () => {
+      fetch('/api/agent/task/' + taskId).then((r) => r.json()).then((d) => {
+        if (d.status === 'done' || d.status === 'failed') {
+          const text = dispatchResultText(d, hotelName);
+          setConvos((prev) => ({ ...prev, [agentId]: [...(prev[agentId] || []), { role: 'assistant', text }] }));
+        } else if (++tries < 80) {
+          setTimeout(poll, 2500);
+        }
+      }).catch(() => { if (++tries < 80) setTimeout(poll, 2500); });
+    };
+    setTimeout(poll, 2500);
+  };
   const openChat = (profile) => { setActiveAgent(profile); setRoute('chat'); };
   const setAgentMessages = (msgs) =>
     setConvos((prev) => ({ ...prev, [activeAgent.id]: msgs }));
@@ -3774,6 +3912,7 @@ function App() {
   else if (route === 'dels') content = <DelegationMgmtPanel />;
   else if (route === 'wallet') content = <window.WalletPanel />;
   else if (route === 'model') content = <ModelPanel model={t.model} setModel={(m) => setTweak('model', m)} />;
+  else if (route === 'persona') content = <PersonaPanel />;
   else if (route.startsWith('del:')) content = <window.DelegationDetail delId={route.split(':')[1]} onBack={() => setRoute('dels')} />;
   else if (route === 'logs') content = <LogsPanel />;
   else if (route === 'settings') content = <window.SettingsPanel />;

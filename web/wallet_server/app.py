@@ -42,6 +42,7 @@ OIDC_SIGNING_KEY_PATH = DATA / "wallet" / "oidc_signing_key.pem"
 REVOCATION_STATE_PATH = DATA / "wallet" / "revocation_state.json"
 LLM_CONFIG_PATH = DATA / "wallet" / "llm_config.json"
 PROFILES_PATH = DATA / "wallet" / "profiles.json"
+PERSONA_PATH = DATA / "wallet" / "persona.json"
 ISSUER_PUBLIC_DIR = DATA / "shared" / "issuer_public"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SCHEMAS_DIR = ROOT / "schemas"
@@ -921,6 +922,32 @@ def llm_config():
     })
 
 
+# ── Persona (人格): user-editable system-prompt addendum for the chat LLM.
+# It tunes tone/behavior only; disclosure stays clamped to the profile's
+# allowed_claims in the tool loop below, so a persona can never over-disclose.
+
+def _load_persona() -> dict:
+    if PERSONA_PATH.exists():
+        try:
+            d = json.loads(PERSONA_PATH.read_text())
+            return {"name": d.get("name") or "默认", "prompt": d.get("prompt") or ""}
+        except Exception:
+            pass
+    return {"name": "默认", "prompt": ""}
+
+
+@app.route("/api/persona", methods=["GET", "POST"])
+def persona():
+    if request.method == "POST":
+        body = request.get_json(force=True, silent=True) or {}
+        PERSONA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        PERSONA_PATH.write_text(json.dumps(
+            {"name": (body.get("name") or "自定义").strip(),
+             "prompt": (body.get("prompt") or "").strip()},
+            ensure_ascii=False, indent=2))
+    return jsonify(_load_persona())
+
+
 # ── Agent profiles (档案): each profile is a named Agent with its own set of
 # claims it is allowed to disclose. allowed_claims is enforced end-to-end: it
 # becomes the delegation policy passed to alice_delegate, so the ZK circuit's
@@ -1047,16 +1074,22 @@ def _llm_system_prompt(catalog: list, holder_claims: list[str], profile: dict | 
              + (" [18+]" if h.get("age") else "") for h in catalog]
     allowed = (profile or {}).get("allowed_claims") or []
     agent_name = (profile or {}).get("name") or "隐私 Agent"
-    return (
+    base = (
         f"你是名为「{agent_name}」的 ZK-AgentAuth 隐私 Agent。你代表用户与商家交互,"
-        "但通过零知识证明,商家只能得知被授权披露的属性,无法回溯用户真实身份。\n"
+        "通过零知识证明,商家只能得知被授权披露的属性,无法回溯用户真实身份。\n"
         f"用户钱包持有的属性: {', '.join(holder_claims) or '(无)'}。\n"
-        f"⚠️ 本 Agent 仅被授权披露这些属性: {', '.join(allowed) or '(无)'}。"
-        "你绝不能尝试披露授权之外的属性;若用户要求披露未授权属性,礼貌拒绝并说明本 Agent 的权限范围。\n"
+        f"本 Agent 被授权披露的属性: {', '.join(allowed) or '(无)'}。"
+        "披露范围由系统在密码学层强制,你无须替系统把关。\n"
         "可预订的酒店目录:\n" + "\n".join(lines) + "\n"
-        "当用户想订酒店时,调用 book_hotel 工具(传 hotel_query 和需要披露的 claims,claims 必须是上面授权列表的子集)。"
-        "若酒店标注 [18+] 但本 Agent 未被授权 age_over_18,则无法预订,需如实告知用户。其他问题正常用中文回答。"
+        "当用户想订酒店时,直接调用 book_hotel 工具(传 hotel_query 即可,claims 可省略,"
+        "系统会自动按本 Agent 的授权披露)。即使授权可能不满足商家要求(如 [18+] 酒店要求"
+        " age_over_18),默认也应先尝试预订——商家验证后会接受或拒绝,你再如实向用户转达结果,"
+        "不要在尝试之前自行拒绝。其他问题正常用中文回答。"
     )
+    p = _load_persona()
+    if p.get("prompt"):
+        base += "\n\n人格设定(用户自定义,与上面冲突时以此为准):\n" + p["prompt"]
+    return base
 
 
 def _call_openai(cfg, messages, tools):
@@ -1153,24 +1186,25 @@ def chat():
             text = (text + "\n\n" if text else "") + \
                 f"抱歉,没找到「{call['args'].get('hotel_query','')}」对应的酒店。"
             break
-        requested = call["args"].get("claims") or (allowed[:1] if allowed else ["age_over_18"])
-        # Hard enforcement: the Agent may only disclose claims in its policy.
+        requested = call["args"].get("claims") or []
         if profile is not None:
-            forbidden = [c for c in requested if c not in allowed]
-            if forbidden:
-                text = (text + "\n\n" if text else "") + (
-                    f"⚠️ 本 Agent「{profile.get('name')}」无权证明 {', '.join(forbidden)},"
-                    f"它只被授权披露: {', '.join(allowed) or '(无)'}。已拒绝本次下单。")
-                break
-            claims = [c for c in requested if c in allowed]
+            # Clamp to the profile's authorization instead of refusing upfront:
+            # the attempt always proceeds with the allowed subset and the
+            # merchant's verification decides. Enforcement stays cryptographic
+            # (ZK policy-claims check), not LLM self-censorship.
+            claims = [c for c in requested if c in allowed] or list(allowed)
+            # 18+ hotels need age_over_18 in the disclosed set; prioritize it
+            # when authorized, since a proof discloses at most 2 claims.
+            if hotel.get("age") and "age_over_18" in allowed and "age_over_18" not in claims[:2]:
+                claims = ["age_over_18"] + [c for c in claims if c != "age_over_18"]
             if not claims:
                 text = (text + "\n\n" if text else "") + \
-                    f"⚠️ 本 Agent「{profile.get('name')}」没有可披露的授权属性,无法完成预订。"
+                    f"⚠️ Agent「{profile.get('name')}」没有任何被授权的属性,无法出示证明。"
                 break
         else:
-            claims = requested
+            claims = requested or ["age_over_18"]
         # ZK spec currently supports at most 2 disclosed claims per proof.
-        claims = claims[:2]
+        claims = list(dict.fromkeys(claims))[:2]
         if not _holder_present():
             return jsonify({"error": "no mDoc on wallet — call /api/wallet/reissue first"}), 400
         dispatch_body = {"hotel_id": hotel["id"], "claims": claims}

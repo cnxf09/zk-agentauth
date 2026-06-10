@@ -28,58 +28,58 @@
 
     /* Navbar - Human */
     .nh { position: sticky; top: 0; z-index: 100; background: #fff; border-bottom: 1px solid var(--border); box-shadow: var(--shadow); padding: 0 24px; height: 56px; display: flex; align-items: center; gap: 16px; }
-    .nh-logo { font-size: 22px; font-weight: 800; color: var(--brand); letter-spacing: -0.5px; cursor: pointer; }
+    .nh-logo { font-size: 24px; font-weight: 800; color: var(--brand); letter-spacing: -0.5px; cursor: pointer; }
     .nh-logo span { color: #1a1a2e; }
-    .nh-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 100px; background: var(--brand-light); color: var(--brand); }
-    .nh-back { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted); cursor: pointer; padding: 5px 10px; border-radius: var(--r); border: 1px solid var(--border); background: none; transition: background 0.15s; }
+    .nh-badge { font-size: 14px; font-weight: 600; padding: 3px 10px; border-radius: 100px; background: var(--brand-light); color: var(--brand); }
+    .nh-back { display: flex; align-items: center; gap: 5px; font-size: 15px; color: var(--muted); cursor: pointer; padding: 5px 10px; border-radius: var(--r); border: 1px solid var(--border); background: none; transition: background 0.15s; }
     .nh-back:hover { background: var(--bg); }
 
     /* Navbar - Agent */
-    .na { position: sticky; top: 0; z-index: 100; background: #1e2030; border-bottom: 1px solid #2d3148; padding: 0 24px; height: 44px; display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; color: #8b97c8; }
-    .na-logo { color: #fff; font-weight: 700; font-size: 13px; }
+    .na { position: sticky; top: 0; z-index: 100; background: #1e2030; border-bottom: 1px solid #2d3148; padding: 0 24px; height: 44px; display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 14px; color: #8b97c8; }
+    .na-logo { color: #fff; font-weight: 700; font-size: 15px; }
     .na-sep { color: #3d4466; }
-    .na-back { margin-left: auto; color: #8b97c8; cursor: pointer; padding: 4px 10px; border-radius: 4px; border: 1px solid #3d4466; background: none; font-family: var(--mono); font-size: 11px; transition: all 0.15s; }
+    .na-back { margin-left: auto; color: #8b97c8; cursor: pointer; padding: 4px 10px; border-radius: 4px; border: 1px solid #3d4466; background: none; font-family: var(--mono); font-size: 13px; transition: all 0.15s; }
     .na-back:hover { background: #2d3148; color: #fff; }
 
     /* Buttons */
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border-radius: var(--r); font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border-radius: var(--r); font-size: 16px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: inherit; }
     .btn-primary { background: var(--brand); color: #fff; }
     .btn-primary:hover { background: #e84e14; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255,90,31,0.3); }
     .btn-zk { background: var(--zk); color: #fff; }
     .btn-zk:hover { background: #4a5cee; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(91,108,255,0.3); }
     .btn-ghost { background: none; border: 1px solid var(--border); color: var(--text); }
     .btn-ghost:hover { background: var(--bg); }
-    .btn-lg { padding: 13px 28px; font-size: 15px; border-radius: var(--r-lg); }
+    .btn-lg { padding: 13px 28px; font-size: 17px; border-radius: var(--r-lg); }
     .btn-full { width: 100%; }
 
     .card { background: var(--card); border-radius: var(--r-lg); border: 1px solid var(--border); box-shadow: var(--shadow); }
 
     /* Hero */
-    .hero { background: linear-gradient(135deg, #0f4c9e 0%, #2563eb 40%, #5B6CFF 70%, #7c3aed 100%); padding: 80px 24px 120px; position: relative; overflow: hidden; }
+    .hero { background: linear-gradient(135deg, rgba(15,76,158,0.93) 0%, rgba(37,99,235,0.88) 40%, rgba(91,108,255,0.86) 70%, rgba(124,58,237,0.90) 100%), url('/hotels/h1.jpg'); background-size: cover; background-position: center 35%; padding: 80px 24px 120px; position: relative; overflow: hidden; }
     .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 50%, rgba(255,255,255,0.07) 0%, transparent 60%), radial-gradient(ellipse at 75% 20%, rgba(124,58,237,0.25) 0%, transparent 50%); pointer-events: none; }
     .hero-inner { position: relative; max-width: 680px; margin: 0 auto; text-align: center; }
-    .hero-logo { font-size: 30px; font-weight: 800; color: #fff; letter-spacing: -1px; display: block; margin-bottom: 24px; }
-    .hero-title { font-size: 40px; font-weight: 700; color: #fff; line-height: 1.25; letter-spacing: -0.5px; }
-    .hero-sub { font-size: 16px; color: rgba(255,255,255,0.72); margin-top: 14px; }
-    .hero-searchbar { margin-top: 36px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 15px 22px; display: flex; align-items: center; gap: 12px; backdrop-filter: blur(8px); color: rgba(255,255,255,0.55); font-size: 14px; }
-    .hero-searchbar input { background: none; border: none; outline: none; color: rgba(255,255,255,0.8); flex: 1; font-size: 15px; font-family: inherit; }
+    .hero-logo { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -1px; display: block; margin-bottom: 24px; }
+    .hero-title { font-size: 42px; font-weight: 700; color: #fff; line-height: 1.25; letter-spacing: -0.5px; }
+    .hero-sub { font-size: 18px; color: rgba(255,255,255,0.72); margin-top: 14px; }
+    .hero-searchbar { margin-top: 36px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 15px 22px; display: flex; align-items: center; gap: 12px; backdrop-filter: blur(8px); color: rgba(255,255,255,0.55); font-size: 16px; }
+    .hero-searchbar input { background: none; border: none; outline: none; color: rgba(255,255,255,0.8); flex: 1; font-size: 17px; font-family: inherit; }
     .hero-searchbar input::placeholder { color: rgba(255,255,255,0.45); }
 
     /* Entry cards */
-    .entry-section { max-width: 780px; margin: -60px auto 60px; padding: 0 20px; }
+    .entry-section { position: relative; z-index: 2; max-width: 780px; margin: -60px auto 60px; padding: 0 20px; }
     .entry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .entry-card { background: #fff; border-radius: 16px; border: 1px solid var(--border); padding: 36px 28px; text-align: center; box-shadow: var(--shadow-lg); transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 14px; }
     .entry-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,0,0,0.12); }
     .entry-icon { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-    .entry-title { font-size: 20px; font-weight: 700; }
-    .entry-desc { font-size: 14px; color: var(--muted); line-height: 1.65; }
+    .entry-title { font-size: 22px; font-weight: 700; }
+    .entry-desc { font-size: 16px; color: var(--muted); line-height: 1.65; }
 
     /* CAPTCHA */
     .gate-wrap { min-height: calc(100vh - 56px); display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
     .captcha-box { border: 1px solid var(--border); border-radius: var(--r); padding: 18px 22px; display: flex; align-items: center; gap: 14px; background: #f9fafb; width: 100%; cursor: pointer; user-select: none; }
     .captcha-chk { width: 24px; height: 24px; border: 2px solid #bababa; border-radius: 3px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
     .captcha-chk.on { background: var(--zk-pass); border-color: var(--zk-pass); }
-    .captcha-logo { font-size: 9px; color: #aaa; text-align: center; line-height: 1.5; }
+    .captcha-logo { font-size: 11px; color: #aaa; text-align: center; line-height: 1.5; }
     .tile-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; border: 2px solid #ccc; border-radius: var(--r); overflow: hidden; }
     .tile { aspect-ratio: 1; position: relative; cursor: pointer; overflow: hidden; }
     .tile-inner { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
@@ -89,64 +89,71 @@
     /* Catalog */
     .cat-layout { display: grid; grid-template-columns: 230px 1fr; gap: 24px; max-width: 1180px; margin: 0 auto; padding: 24px 20px; }
     .sidebar { position: sticky; top: 72px; height: fit-content; }
-    .sb-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
-    .filter-row { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 14px; cursor: pointer; }
+    .sb-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+    .filter-row { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 16px; cursor: pointer; }
     .fcheck { width: 16px; height: 16px; border: 2px solid var(--border); border-radius: 3px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
     .fcheck.on { background: var(--zk); border-color: var(--zk); }
     .hotel-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 18px; }
     .hcard { background: #fff; border-radius: var(--r-lg); border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); transition: all 0.2s; cursor: pointer; }
     .hcard:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
-    .hcard-img { height: 160px; position: relative; display: flex; align-items: center; justify-content: center; }
-    .hcard-badges { position: absolute; top: 10px; left: 10px; display: flex; gap: 5px; }
-    .badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
+    .hcard-img { height: 180px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .hcard-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.45s ease; }
+    .hcard:hover .hcard-photo { transform: scale(1.06); }
+    .hcard-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 48%, rgba(0,0,0,0.38)); pointer-events: none; }
+    .hcard-price-tag { position: absolute; right: 10px; bottom: 10px; z-index: 2; background: rgba(15,18,30,0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; padding: 4px 11px; border-radius: 8px; font-weight: 800; font-size: 18px; letter-spacing: -0.3px; }
+    .hcard-price-tag small { font-weight: 500; font-size: 13px; opacity: 0.8; }
+    .hcard-badges { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; gap: 5px; }
+    .badge { font-size: 13px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
     .badge-promo { background: var(--brand); color: #fff; }
     .badge-age { background: #1e2030; color: #fff; }
     .badge-hot { background: #e11d48; color: #fff; }
     .hcard-body { padding: 14px 16px; }
-    .hname { font-size: 16px; font-weight: 700; margin-bottom: 5px; line-height: 1.3; }
-    .hloc { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .hname { font-size: 18px; font-weight: 700; margin-bottom: 5px; line-height: 1.3; }
+    .hloc { display: flex; align-items: center; gap: 4px; font-size: 15px; color: var(--muted); margin-bottom: 8px; }
     .hrating { display: flex; align-items: center; gap: 7px; margin-bottom: 11px; }
     .stars { display: flex; gap: 2px; }
     .hfooter { display: flex; align-items: center; justify-content: space-between; }
-    .hprice { font-size: 22px; font-weight: 800; color: var(--price); }
-    .hprice-unit { font-size: 13px; font-weight: 400; color: var(--muted); }
+    .hprice { font-size: 24px; font-weight: 800; color: var(--price); }
+    .hprice-unit { font-size: 15px; font-weight: 400; color: var(--muted); }
 
     /* Detail */
     .detail-wrap { max-width: 940px; margin: 0 auto; padding: 28px 20px 60px; display: grid; grid-template-columns: 1fr 360px; gap: 28px; align-items: start; }
-    .detail-img { height: 280px; border-radius: var(--r-lg); overflow: hidden; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
-    .detail-name { font-size: 26px; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 8px; }
-    .detail-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; font-size: 14px; color: var(--muted); }
+    .detail-img { height: 320px; border-radius: var(--r-lg); overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: var(--shadow-md); }
+    .detail-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+    .detail-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,0.28)); pointer-events: none; }
+    .detail-name { font-size: 28px; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 8px; }
+    .detail-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; font-size: 16px; color: var(--muted); }
     .form-card { padding: 22px 24px; position: sticky; top: 72px; }
-    .form-ttl { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+    .form-ttl { font-size: 18px; font-weight: 700; margin-bottom: 18px; }
     .form-grp { margin-bottom: 14px; }
-    .form-lbl { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: 0.05em; }
-    .form-inp { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); font-size: 14px; font-family: inherit; color: var(--text); background: #fff; outline: none; transition: border-color 0.15s; }
+    .form-lbl { font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: 0.05em; }
+    .form-inp { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); font-size: 16px; font-family: inherit; color: var(--text); background: #fff; outline: none; transition: border-color 0.15s; }
     .form-inp:focus { border-color: var(--zk); }
     .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .form-price-row { font-size: 14px; color: var(--muted); margin-bottom: 14px; }
-    .form-price-row strong { font-size: 22px; font-weight: 800; color: var(--price); }
-    .form-note { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
+    .form-price-row { font-size: 16px; color: var(--muted); margin-bottom: 14px; }
+    .form-price-row strong { font-size: 24px; font-weight: 800; color: var(--price); }
+    .form-note { font-size: 14px; color: var(--muted); text-align: center; margin-top: 10px; }
 
     /* Success */
     .success-wrap { min-height: calc(100vh - 56px); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; }
     .success-icon { width: 80px; height: 80px; border-radius: 50%; background: var(--zk-pass-light); display: flex; align-items: center; justify-content: center; margin-bottom: 22px; }
-    .success-ttl { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 6px; }
-    .success-order { font-size: 14px; color: var(--muted); margin-bottom: 22px; }
+    .success-ttl { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 6px; }
+    .success-order { font-size: 16px; color: var(--muted); margin-bottom: 22px; }
     .success-summary { background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px 26px; text-align: left; margin-bottom: 18px; max-width: 380px; width: 100%; }
-    .srow { display: flex; justify-content: space-between; padding: 7px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
+    .srow { display: flex; justify-content: space-between; padding: 7px 0; font-size: 16px; border-bottom: 1px solid var(--border); }
     .srow:last-child { border-bottom: none; }
-    .zk-micro { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--zk); background: var(--zk-light); padding: 4px 10px; border-radius: 100px; font-weight: 600; }
+    .zk-micro { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--zk); background: var(--zk-light); padding: 4px 10px; border-radius: 100px; font-weight: 600; }
 
     /* Agent base */
     .aw { background: #f8f9fc; min-height: calc(100vh - 44px); font-family: var(--mono); }
-    .ah { background: #1e2030; border-bottom: 1px solid #2d3148; padding: 14px 24px; font-size: 12px; color: #8b97c8; font-family: var(--mono); }
+    .ah { background: #1e2030; border-bottom: 1px solid #2d3148; padding: 14px 24px; font-size: 14px; color: #8b97c8; font-family: var(--mono); }
 
     /* Agent gate panels */
     .ag-content { max-width: 1080px; margin: 0 auto; padding: 28px 24px; display: grid; grid-template-columns: 1fr 360px; gap: 22px; }
     .ap { background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
-    .ap-hdr { background: #1e2030; padding: 10px 16px; font-size: 11px; color: #8b97c8; font-family: var(--mono); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .ap-hdr { background: #1e2030; padding: 10px 16px; font-size: 13px; color: #8b97c8; font-family: var(--mono); font-weight: 600; display: flex; align-items: center; gap: 8px; }
     .ap-body { padding: 20px; }
-    .code-block { font-family: var(--mono); font-size: 12.5px; line-height: 1.8; overflow-x: auto; white-space: pre; }
+    .code-block { font-family: var(--mono); font-size: 14.5px; line-height: 1.8; overflow-x: auto; white-space: pre; }
     .ck { color: #5B6CFF; } .cs { color: #16a34a; } .ch { color: #f59e0b; } .cp { color: #6b7280; }
 
     /* Verify steps */
@@ -155,32 +162,32 @@
     .vstep-icon { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
     .vstep-icon.pass { background: var(--zk-pass); border-color: var(--zk-pass); }
     .vstep-icon.spin { border-color: var(--zk); border-top-color: transparent; animation: spin 0.8s linear infinite; }
-    .vstep-lbl { font-size: 13px; font-weight: 700; color: var(--text); font-family: var(--mono); }
-    .vstep-det { font-size: 11px; color: var(--muted); margin-top: 3px; }
-    .vstep-status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 100px; flex-shrink: 0; }
+    .vstep-lbl { font-size: 15px; font-weight: 700; color: var(--text); font-family: var(--mono); }
+    .vstep-det { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .vstep-status { font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 100px; flex-shrink: 0; }
     .vstep-status.pass { background: #dcfce7; color: var(--zk-pass); }
 
     /* Hex badge */
     .hex-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px; animation: fadeInUp 0.45s ease; }
-    .hex-lbl { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; }
+    .hex-lbl { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.1em; }
 
     /* Agent catalog */
     .acat-wrap { max-width: 1080px; margin: 0 auto; padding: 28px 24px; }
-    .verified-banner { display: flex; align-items: center; gap: 10px; background: #eef0ff; border: 1px solid #c7d0ff; border-radius: var(--r); padding: 11px 16px; margin-bottom: 18px; font-size: 13px; font-family: var(--mono); }
-    .atable { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .atable th { text-align: left; padding: 10px 12px; background: #1e2030; color: #8b97c8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
+    .verified-banner { display: flex; align-items: center; gap: 10px; background: #eef0ff; border: 1px solid #c7d0ff; border-radius: var(--r); padding: 11px 16px; margin-bottom: 18px; font-size: 15px; font-family: var(--mono); }
+    .atable { width: 100%; border-collapse: collapse; font-size: 15px; }
+    .atable th { text-align: left; padding: 10px 12px; background: #1e2030; color: #8b97c8; font-size: 13px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600; }
     .atable td { padding: 12px; border-bottom: 1px solid var(--border); }
     .atable tr:hover td { background: #f9fafb; }
-    .age-tag { font-size: 11px; font-weight: 700; background: #1e2030; color: #fff; padding: 2px 8px; border-radius: 4px; }
-    .abook { font-family: var(--mono); font-size: 12px; color: var(--zk); cursor: pointer; background: none; border: 1px solid var(--zk); border-radius: 4px; padding: 4px 10px; transition: all 0.15s; }
+    .age-tag { font-size: 13px; font-weight: 700; background: #1e2030; color: #fff; padding: 2px 8px; border-radius: 4px; }
+    .abook { font-family: var(--mono); font-size: 14px; color: var(--zk); cursor: pointer; background: none; border: 1px solid var(--zk); border-radius: 4px; padding: 4px 10px; transition: all 0.15s; }
     .abook:hover { background: var(--zk); color: #fff; }
 
     /* Agent checkout */
     .achk-wrap { max-width: 860px; margin: 0 auto; padding: 28px 24px; display: grid; grid-template-columns: 1fr 320px; gap: 22px; }
-    .chk-lbl { font-size: 10px; color: #8b97c8; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
-    .chk-val { font-size: 14px; font-weight: 600; margin-bottom: 13px; }
-    .claim-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--zk-pass-light); border: 1px solid #bbf7d0; border-radius: 100px; padding: 4px 11px; font-size: 11px; font-weight: 700; color: var(--zk-pass); font-family: var(--mono); margin: 3px; }
-    .agent-note { font-size: 11px; color: var(--muted); margin-top: 12px; padding: 10px 14px; background: #f9fafb; border-radius: var(--r); border: 1px dashed var(--border); text-align: center; line-height: 1.8; }
+    .chk-lbl { font-size: 12px; color: #8b97c8; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
+    .chk-val { font-size: 16px; font-weight: 600; margin-bottom: 13px; }
+    .claim-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--zk-pass-light); border: 1px solid #bbf7d0; border-radius: 100px; padding: 4px 11px; font-size: 13px; font-weight: 700; color: var(--zk-pass); font-family: var(--mono); margin: 3px; }
+    .agent-note { font-size: 13px; color: var(--muted); margin-top: 12px; padding: 10px 14px; background: #f9fafb; border-radius: var(--r); border: 1px dashed var(--border); text-align: center; line-height: 1.8; }
 
     /* Agent success */
     .asuc-hero { background: #1e2030; padding: 56px 24px 44px; text-align: center; }
@@ -198,7 +205,7 @@
     /* Responsive */
     @media (max-width: 768px) {
       .entry-grid, .hotel-grid, .detail-wrap, .ag-content, .achk-wrap { grid-template-columns: 1fr; }
-      .hero-title { font-size: 26px; }
+      .hero-title { font-size: 28px; }
       .cat-layout { grid-template-columns: 1fr; }
       .sidebar { display: none; }
     }
@@ -384,7 +391,7 @@ function Landing({ go }) {
           <div className="hero-searchbar">
             <IcoPin/>
             <input placeholder="目的地、酒店名称或景点..." readOnly/>
-            <div style={{display:'flex',gap:10,color:'rgba(255,255,255,0.45)',fontSize:13,flexShrink:0}}>
+            <div style={{display:'flex',gap:10,color:'rgba(255,255,255,0.45)',fontSize:15,flexShrink:0}}>
               <span>入住</span><span>|</span><span>退房</span><span>|</span><span>1间</span>
             </div>
           </div>
@@ -426,20 +433,20 @@ function HumanGate({ go }) {
       <div className="gate-wrap">
         <div style={{maxWidth:400,width:'100%'}}>
           <div className="card" style={{padding:'36px 30px',textAlign:'center'}}>
-            <h2 style={{fontSize:20,fontWeight:700,marginBottom:8}}>请验证您不是机器人</h2>
-            <p style={{fontSize:14,color:'#6b7280',marginBottom:26}}>TripGo 使用人机验证保护预订资源</p>
+            <h2 style={{fontSize:22,fontWeight:700,marginBottom:8}}>请验证您不是机器人</h2>
+            <p style={{fontSize:16,color:'#6b7280',marginBottom:26}}>TripGo 使用人机验证保护预订资源</p>
 
             {phase==='idle' && (
               <div className="captcha-box fi" onClick={handleBox} style={{marginBottom:20}}>
                 <div className="captcha-chk"/>
-                <span style={{flex:1,fontSize:14,color:'#444'}}>I'm not a robot</span>
+                <span style={{flex:1,fontSize:16,color:'#444'}}>I'm not a robot</span>
                 <div className="captcha-logo">reCAPTCHA<br/>隐私权 · 条款</div>
               </div>
             )}
 
             {phase==='grid' && (
               <div className="fi" style={{marginBottom:18}}>
-                <p style={{fontSize:13,fontWeight:600,color:'#374151',textAlign:'left',marginBottom:10}}>请选择所有包含 山脉景观 的图块</p>
+                <p style={{fontSize:15,fontWeight:600,color:'#374151',textAlign:'left',marginBottom:10}}>请选择所有包含 山脉景观 的图块</p>
                 <div className="tile-grid" style={{marginBottom:12}}>
                   {TILES.map((t,i)=>(
                     <div key={i} className={`tile${sel.has(i)?' sel':''}`} onClick={()=>toggleTile(i)}>
@@ -455,7 +462,7 @@ function HumanGate({ go }) {
             {phase==='verifying' && (
               <div className="fi" style={{padding:'22px 0',display:'flex',flexDirection:'column',alignItems:'center',gap:14}}>
                 <div style={{width:40,height:40,borderRadius:'50%',border:'3px solid #5B6CFF',borderTopColor:'transparent',animation:'spin 0.8s linear infinite'}}/>
-                <p style={{fontSize:14,color:'#6b7280'}}>正在验证...</p>
+                <p style={{fontSize:16,color:'#6b7280'}}>正在验证...</p>
               </div>
             )}
 
@@ -464,11 +471,11 @@ function HumanGate({ go }) {
                 <div style={{width:48,height:48,background:'#f0fdf4',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',animation:'checkPop 0.4s ease'}}>
                   <IcoChk size={26}/>
                 </div>
-                <p style={{fontSize:15,fontWeight:700,color:'#16a34a'}}>验证成功</p>
+                <p style={{fontSize:17,fontWeight:700,color:'#16a34a'}}>验证成功</p>
               </div>
             )}
           </div>
-          <p style={{fontSize:13,color:'#9ca3af',textAlign:'center',marginTop:18}}>
+          <p style={{fontSize:15,color:'#9ca3af',textAlign:'center',marginTop:18}}>
             如果您是 AI Agent，请使用{' '}
             <span style={{color:'#5B6CFF',cursor:'pointer',fontWeight:600}} onClick={()=>go('agent-monitor','agent')}>Agent 通道</span>
           </p>
@@ -482,12 +489,15 @@ function HumanGate({ go }) {
 function HCard({ h, onPick }) {
   return (
     <div className="hcard" onClick={()=>onPick(h)}>
-      <div className="hcard-img" style={{background:h.grad}}>
-        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" opacity="0.5">
-          <path d="M5 40L17 16L24 28L30 18L40 40H5Z" fill="rgba(255,255,255,0.5)" stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" strokeLinejoin="round"/>
-        </svg>
+      <div className="hcard-img" style={h.cover?null:{background:h.grad}}>
+        {h.cover
+          ? <img className="hcard-photo" src={h.cover} alt={h.name} loading="lazy"/>
+          : <svg width="44" height="44" viewBox="0 0 44 44" fill="none" opacity="0.5">
+              <path d="M5 40L17 16L24 28L30 18L40 40H5Z" fill="rgba(255,255,255,0.5)" stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" strokeLinejoin="round"/>
+            </svg>}
         <div className="hcard-badges">
           {h.tag && <span className={`badge ${h.tagCls}`}>{h.tag}</span>}
+          {h.age && <span className="badge badge-age">18+</span>}
         </div>
       </div>
       <div className="hcard-body">
@@ -495,12 +505,12 @@ function HCard({ h, onPick }) {
         <div className="hloc"><IcoPin/><span>{h.loc}</span></div>
         <div className="hrating">
           <Stars n={h.stars}/>
-          <span style={{fontSize:13,fontWeight:700}}>{h.rating}</span>
-          <span style={{fontSize:12,color:'#6b7280'}}>({h.reviews.toLocaleString()}评)</span>
+          <span style={{fontSize:15,fontWeight:700}}>{h.rating}</span>
+          <span style={{fontSize:14,color:'#6b7280'}}>({h.reviews.toLocaleString()}评)</span>
         </div>
         <div className="hfooter">
           <div><span className="hprice">¥{h.price.toLocaleString()}</span><span className="hprice-unit">/晚</span></div>
-          <button className="btn btn-primary" style={{padding:'7px 14px',fontSize:13}} onClick={e=>{e.stopPropagation();onPick(h);}}>查看详情</button>
+          <button className="btn btn-primary" style={{padding:'7px 14px',fontSize:15}} onClick={e=>{e.stopPropagation();onPick(h);}}>查看详情</button>
         </div>
       </div>
     </div>
@@ -538,8 +548,8 @@ function HumanCatalog({ go, onSel }) {
         </div>
         <div>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-            <p style={{fontSize:14,color:'#6b7280'}}>共 {list.length} 家住宿</p>
-            <select style={{fontSize:13,border:'1px solid #e5e7eb',borderRadius:6,padding:'6px 10px',background:'#fff',color:'#374151',cursor:'pointer',outline:'none'}}>
+            <p style={{fontSize:16,color:'#6b7280'}}>共 {list.length} 家住宿</p>
+            <select style={{fontSize:15,border:'1px solid #e5e7eb',borderRadius:6,padding:'6px 10px',background:'#fff',color:'#374151',cursor:'pointer',outline:'none'}}>
               <option>推荐排序</option><option>价格从低到高</option><option>评分最高</option>
             </select>
           </div>
@@ -579,10 +589,12 @@ function HumanDetail({ go, hotel, setOrder }) {
       <NavHuman go={go}/>
       <div className="detail-wrap fiu">
         <div>
-          <div className="detail-img" style={{background:hotel.grad}}>
-            <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-              <path d="M6 50L20 20L30 36L38 24L50 50H6Z" fill="rgba(255,255,255,0.38)" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinejoin="round"/>
-            </svg>
+          <div className="detail-img" style={hotel.cover?null:{background:hotel.grad}}>
+            {hotel.cover
+              ? <img className="detail-photo" src={hotel.cover} alt={hotel.name}/>
+              : <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+                  <path d="M6 50L20 20L30 36L38 24L50 50H6Z" fill="rgba(255,255,255,0.38)" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinejoin="round"/>
+                </svg>}
           </div>
           <h1 className="detail-name">{hotel.name}</h1>
           <div className="detail-meta">
@@ -592,14 +604,14 @@ function HumanDetail({ go, hotel, setOrder }) {
             <span style={{display:'flex',alignItems:'center',gap:4}}><IcoPin/>{hotel.loc}</span>
           </div>
           {hotel.age && (
-            <div style={{background:'#fef9c3',border:'1px solid #fde047',borderRadius:8,padding:'12px 16px',fontSize:14,color:'#854d0e',marginBottom:20}}>
+            <div style={{background:'#fef9c3',border:'1px solid #fde047',borderRadius:8,padding:'12px 16px',fontSize:16,color:'#854d0e',marginBottom:20}}>
               该住宿仅限 18 岁及以上成年人入住，须提供有效身份证明。
             </div>
           )}
-          <p style={{fontSize:14,color:'#374151',lineHeight:1.85,marginBottom:14}}>
+          <p style={{fontSize:16,color:'#374151',lineHeight:1.85,marginBottom:14}}>
             精心打造的度假体验，坐落于{hotel.loc}，提供顶级舒适享受。所有客房配备高速 Wi-Fi、空调、独立卫浴。部分房型可享城市景观或自然风光。
           </p>
-          <p style={{fontSize:14,color:'#374151',lineHeight:1.85}}>
+          <p style={{fontSize:16,color:'#374151',lineHeight:1.85}}>
             提供 24 小时礼宾服务、健身中心、游泳池。早餐可选。退房时间 12:00。支持在线取消。
           </p>
         </div>
@@ -637,7 +649,7 @@ function HumanDetail({ go, hotel, setOrder }) {
             <button className="btn btn-primary btn-full btn-lg" disabled={busy} onClick={submit}>
               {busy ? '处理中...' : `确认预订 ¥${total.toLocaleString()}`}
             </button>
-            {err && <p style={{color:'#dc2626',fontSize:12,marginTop:8,textAlign:'center'}}>错误：{err}</p>}
+            {err && <p style={{color:'#dc2626',fontSize:14,marginTop:8,textAlign:'center'}}>错误：{err}</p>}
             <p className="form-note">价格含税 · 支持 7 天无理由退款 · 免费取消</p>
           </div>
         </div>
@@ -744,7 +756,7 @@ function AgentMonitor({ go }) {
           </div>
           <div className="ap-body">
             {!incoming && (
-              <div style={{padding:'40px 0',textAlign:'center',color:'#9ca3af',fontFamily:'var(--mono)',fontSize:13}}>
+              <div style={{padding:'40px 0',textAlign:'center',color:'#9ca3af',fontFamily:'var(--mono)',fontSize:15}}>
                 <div style={{width:32,height:32,borderRadius:'50%',border:'3px solid #e5e7eb',borderTopColor:'#5B6CFF',animation:'spin 1.2s linear infinite',margin:'0 auto 14px'}}/>
                 listening on /api/agent/feed
               </div>
@@ -766,7 +778,7 @@ function AgentMonitor({ go }) {
                 <span className="cp">{'}'}</span>
               </div>
             )}
-            <div style={{marginTop:14,padding:'10px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:6,fontFamily:'var(--mono)',fontSize:11,color:'#6b7280',lineHeight:1.8}}>
+            <div style={{marginTop:14,padding:'10px 14px',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:6,fontFamily:'var(--mono)',fontSize:13,color:'#6b7280',lineHeight:1.8}}>
               <div>POST /api/agent/order HTTP/1.1</div>
               <div>Content-Type: multipart/form-data</div>
               <div>X-ZK-Protocol: ZK-AgentAuth-v1 · SM2/SM3 delegation + Ligero v2</div>
@@ -788,7 +800,7 @@ function AgentMonitor({ go }) {
             </div>
             <div className="ap-body">
               {phase==='idle' && (
-                <p style={{fontSize:12,color:'#9ca3af',fontFamily:'var(--mono)',textAlign:'center',padding:'18px 0'}}>等待第一笔 Agent 请求...</p>
+                <p style={{fontSize:14,color:'#9ca3af',fontFamily:'var(--mono)',textAlign:'center',padding:'18px 0'}}>等待第一笔 Agent 请求...</p>
               )}
               {phase!=='idle' && (
                 <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -801,7 +813,7 @@ function AgentMonitor({ go }) {
                       <div key={s.key} className={`vstep${passed?' pass':''}`} style={failed?{background:'#fef2f2',borderColor:'#fecaca'}:{}}>
                         <div className={`vstep-icon${passed?' pass':wait?' spin':''}`} style={failed?{background:'#dc2626',borderColor:'#dc2626'}:{}}>
                           {passed && <IcoChk size={13} color="#fff"/>}
-                          {failed && <span style={{color:'#fff',fontSize:14,lineHeight:1}}>×</span>}
+                          {failed && <span style={{color:'#fff',fontSize:16,lineHeight:1}}>×</span>}
                         </div>
                         <div style={{flex:1}}>
                           <div className="vstep-lbl">{s.lbl}</div>
@@ -818,14 +830,14 @@ function AgentMonitor({ go }) {
               {verified && (
                 <div style={{marginTop:18}}>
                   {overallAccepted ? <HexBadge size={118} label="VERIFIED"/> : (
-                    <div style={{textAlign:'center',padding:'16px 0',color:'#dc2626',fontFamily:'var(--mono)',fontSize:14,fontWeight:700}}>OVERALL: REJECT</div>
+                    <div style={{textAlign:'center',padding:'16px 0',color:'#dc2626',fontFamily:'var(--mono)',fontSize:16,fontWeight:700}}>OVERALL: REJECT</div>
                   )}
                   {verified.order && (
-                    <div style={{marginTop:14,padding:'12px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,fontSize:13}}>
-                      <div style={{fontFamily:'var(--mono)',fontSize:11,color:'#16a34a',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.06em'}}>订单已创建</div>
+                    <div style={{marginTop:14,padding:'12px 14px',background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,fontSize:15}}>
+                      <div style={{fontFamily:'var(--mono)',fontSize:13,color:'#16a34a',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.06em'}}>订单已创建</div>
                       <div style={{fontWeight:700,marginBottom:4}}>{verified.order.hotel_name}</div>
-                      <div style={{fontSize:12,color:'#374151'}}>{verified.order.checkin} → {verified.order.checkout} · ¥{verified.order.amount.toLocaleString()}</div>
-                      <div style={{fontFamily:'var(--mono)',fontSize:11,color:'#5B6CFF',marginTop:6}}>{verified.order.order_id}</div>
+                      <div style={{fontSize:14,color:'#374151'}}>{verified.order.checkin} → {verified.order.checkout} · ¥{verified.order.amount.toLocaleString()}</div>
+                      <div style={{fontFamily:'var(--mono)',fontSize:13,color:'#5B6CFF',marginTop:6}}>{verified.order.order_id}</div>
                     </div>
                   )}
                 </div>
@@ -839,7 +851,7 @@ function AgentMonitor({ go }) {
               <div className="ap-hdr">最近交易（{history.length}）</div>
               <div className="ap-body" style={{padding:'4px 0'}}>
                 {history.map((h,i)=>(
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',borderBottom:i<history.length-1?'1px solid #f3f4f6':'none',fontSize:12,fontFamily:'var(--mono)'}}>
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',borderBottom:i<history.length-1?'1px solid #f3f4f6':'none',fontSize:14,fontFamily:'var(--mono)'}}>
                     <span style={{width:8,height:8,borderRadius:'50%',background:h.accepted?'#16a34a':'#dc2626'}}/>
                     <span style={{color:'#5B6CFF'}}>{h.order_id}</span>
                     <span style={{color:'#374151',flex:1,fontFamily:'-apple-system,sans-serif'}}>{h.hotel_name}</span>
