@@ -59,7 +59,7 @@ function localISODateOffset(days) {
   return `${y}-${m}-${day}`;
 }
 function defaultStayDates() {
-  return { checkin: localISODateOffset(1), checkout: localISODateOffset(3) };
+  return { checkin: localISODateOffset(0), checkout: localISODateOffset(1) };
 }
 // ===== app-data.jsx =====
 // app-data.jsx — mock data for ZK-AgentAuth client

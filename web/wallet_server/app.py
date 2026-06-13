@@ -90,10 +90,10 @@ _bootstrap_lock = threading.Lock()
 
 
 def _default_stay_dates() -> tuple[str, str]:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now().astimezone().date()
     return (
+        today.isoformat(),
         (today + timedelta(days=1)).isoformat(),
-        (today + timedelta(days=3)).isoformat(),
     )
 
 

@@ -74,11 +74,20 @@ def _new_order_id(prefix: str) -> str:
 
 
 def _default_stay_dates() -> tuple[str, str]:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now().astimezone().date()
     return (
+        today.isoformat(),
         (today + timedelta(days=1)).isoformat(),
-        (today + timedelta(days=3)).isoformat(),
     )
+
+
+def _stay_nights(checkin: str, checkout: str) -> int:
+    try:
+        start = datetime.strptime(checkin, "%Y-%m-%d").date()
+        end = datetime.strptime(checkout, "%Y-%m-%d").date()
+    except ValueError:
+        return 1
+    return max((end - start).days, 1)
 
 
 def _b64url(data: bytes) -> str:
@@ -523,10 +532,10 @@ def order_human():
         "checkout": body.get("checkout") or default_checkout,
         "contact_name": body.get("contact_name", ""),
         "phone": body.get("phone", ""),
-        "amount": hotel["price"] * 2,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "ACCEPT",
     }
+    order["amount"] = hotel["price"] * _stay_nights(order["checkin"], order["checkout"])
     _save_order(order)
     return jsonify(order)
 
@@ -686,13 +695,13 @@ def _verify_presentation(order_req: dict, request_dir: Path, presentation_dir: P
             "hotel_name": hotel["name"],
             "checkin": order_req.get("checkin") or default_checkin,
             "checkout": order_req.get("checkout") or default_checkout,
-            "amount": hotel["price"] * 2,
             "agent_id": order_req.get("agent_id"),
             "claims_proven": claims,
             "proof_size": proof_size,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "status": "ACCEPT",
         }
+        order["amount"] = hotel["price"] * _stay_nights(order["checkin"], order["checkout"])
         _save_order(order)
 
     FEED.publish("verified",
